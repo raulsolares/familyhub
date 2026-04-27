@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Edit2, Trash2, UtensilsCrossed, X, Plus, Minus } from 'lucide-react';
+import { Search, Edit2, Trash2, UtensilsCrossed, X, Minus } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useData } from '../context/DataContext';
 import type { Food, Ingredient } from '../context/DataContext';

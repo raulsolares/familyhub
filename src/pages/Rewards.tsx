@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { Award, TrendingUp, Trophy, Gift, History, PlusSquare, Trash2, X } from 'lucide-react';
+import { Award, TrendingUp, Trophy, History, PlusSquare, Trash2, X } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useData } from '../context/DataContext';
 
 const Rewards = () => {
   const { user } = useUser();
-  const { points, rewards, pointLogs, rules, addPointLog, deletePointLog, members } = useData();
+  const { points, pointLogs, rules, addPointLog, deletePointLog, members } = useData();
 
   const [showLogForm, setShowLogForm] = useState(false);
   const [selectedMember, setSelectedMember] = useState('Alan');

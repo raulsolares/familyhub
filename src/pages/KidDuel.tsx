@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useData } from '../context/DataContext';
-import { Trophy, CheckCircle, Zap, Star, ArrowLeft } from 'lucide-react';
+import { Trophy, Star, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const KidDuel = () => {

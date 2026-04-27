@@ -20,7 +20,7 @@ const Chores = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    addChore({ name, user, freq });
+    addChore({ name, user, freq, points: 20 });
     setName('');
     setShowForm(false);
   };

@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { UserPlus, Shield, Clock, Trash2, Edit2, List, CheckCircle } from 'lucide-react';
+import { UserPlus, Shield, Clock, Trash2, Edit2, List } from 'lucide-react';
 import { useData } from '../context/DataContext';
 
 const Settings = () => {
-  const { members, rules, routines, chores, addRule, deleteRule, addRoutine, deleteRoutine, addChore, deleteChore } = useData();
+  const { members, rules, routines, chores, addRule, deleteRule, deleteRoutine, addChore, deleteChore } = useData();
   
   const [activeTab, setActiveTab] = useState<'members' | 'rules' | 'routines' | 'chores'>('members');
   
@@ -17,7 +17,7 @@ const Settings = () => {
   const [choreName, setChoreName] = useState('');
   const [choreUser, setChoreUser] = useState('Alan');
   const [chorePoints, setChorePoints] = useState(20);
-  const [choreFreq, setChoreFreq] = useState('Diario');
+  const [choreFreq] = useState('Diario');
 
   const handleAddRule = (e: FormEvent) => {
     e.preventDefault();

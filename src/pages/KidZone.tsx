@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Trophy, CheckCircle, GraduationCap, Star, Zap, Utensils, X, Check, Timer, Swords } from 'lucide-react';
+import { Trophy, Star, Zap, Utensils, X, Check, Timer, Swords, Plus } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useData } from '../context/DataContext';
 import { Link } from 'react-router-dom';
+
 
 const KidZone = () => {
   const { user } = useUser();

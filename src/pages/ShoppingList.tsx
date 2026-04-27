@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Download, Tag, ShoppingBasket, X } from 'lucide-react';
+import { Plus, Tag, ShoppingBasket, X } from 'lucide-react';
 import { useData } from '../context/DataContext';
 
 interface ShoppingItem {

@@ -6,7 +6,8 @@ import { useData } from '../context/DataContext';
 interface ShoppingItem {
   id: string;
   name: string;
-  qty: string;
+  qty: number;
+  unit: string;
   price: number;
   category: string;
   fromMenu: boolean;
@@ -18,30 +19,37 @@ const ShoppingMode = () => {
   const [items, setItems] = useState<ShoppingItem[]>([]);
 
   useEffect(() => {
-    // 1. Generar lista del menú
-    const ingredientsMap = new Map<string, ShoppingItem>();
+    // 1. Generar lista agregada del menú
+    const aggregation = new Map<string, { name: string, qty: number, unit: string }>();
+    
     weeklyMenu.forEach(slot => {
       const food = foods.find(f => f.id === slot.foodId);
       if (food) {
         food.ingredients.forEach(ing => {
-          if (!ingredientsMap.has(ing)) {
-            ingredientsMap.set(ing, {
-              id: `menu_${ing}`,
-              name: ing,
-              qty: '1 pza/paq',
-              price: 30,
-              category: 'Despensa',
-              fromMenu: true,
-              bought: false
-            });
+          const key = `${ing.name.toLowerCase()}_${ing.unit}`;
+          const existing = aggregation.get(key);
+          if (existing) {
+            existing.qty += ing.amount;
+          } else {
+            aggregation.set(key, { name: ing.name, qty: ing.amount, unit: ing.unit });
           }
         });
       }
     });
-    const menuItems = Array.from(ingredientsMap.values());
+
+    const menuItems: ShoppingItem[] = Array.from(aggregation.values()).map((val, idx) => ({
+      id: `menu_${idx}`,
+      name: val.name,
+      qty: val.qty,
+      unit: val.unit,
+      price: 0,
+      category: 'Despensa',
+      fromMenu: true,
+      bought: false
+    }));
 
     // 2. Obtener lista manual
-    const savedManual = localStorage.getItem('fh_manual_shopping');
+    const savedManual = localStorage.getItem('fh_manual_shopping_v4');
     const manualItems: ShoppingItem[] = savedManual ? JSON.parse(savedManual) : [];
 
     setItems([...menuItems, ...manualItems]);
@@ -52,7 +60,6 @@ const ShoppingMode = () => {
   };
 
   const boughtCount = items.filter(i => i.bought).length;
-  const totalBought = items.filter(i => i.bought).reduce((acc, i) => acc + i.price, 0);
 
   return (
     <div style={{ maxWidth: '600px', margin: '0 auto', paddingBottom: '100px' }}>
@@ -96,7 +103,7 @@ const ShoppingMode = () => {
                 </p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.2rem' }}>
                   {item.fromMenu && <span style={{ fontSize: '0.6rem', background: item.bought ? '#dcfce7' : '#eef2ff', color: item.bought ? '#166534' : '#4338ca', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: '800' }}>MENÚ</span>}
-                  <p style={{ fontSize: '0.875rem', color: 'var(--p-text-muted)' }}>{item.qty} • ${item.price}</p>
+                  <p style={{ fontSize: '0.875rem', color: 'var(--p-text-muted)', fontWeight: '700' }}>{item.qty} {item.unit}</p>
                 </div>
               </div>
             </div>
@@ -122,7 +129,7 @@ const ShoppingMode = () => {
       }}>
         <div>
           <p style={{ fontSize: '0.75rem', opacity: 0.9 }}>Llevas {boughtCount} de {items.length}</p>
-          <p style={{ fontSize: '1.25rem', fontWeight: '800' }}>Total: ${totalBought.toFixed(2)}</p>
+          <p style={{ fontSize: '1.25rem', fontWeight: '800' }}>¡Buen progreso!</p>
         </div>
         <Link to="/shopping" style={{ textDecoration: 'none' }}>
           <button style={{ background: 'white', color: 'var(--p-primary)', border: 'none', padding: '0.75rem 1rem', borderRadius: '12px', fontWeight: '700', cursor: 'pointer' }}>

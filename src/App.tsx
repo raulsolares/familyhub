@@ -13,11 +13,11 @@ import KidDuel from './pages/KidDuel';
 import Login from './pages/Login';
 import { useUser } from './context/UserContext';
 import { useData } from './context/DataContext';
-import { Bell, Calendar, ChevronRight, Utensils, CheckCircle, TrendingUp } from 'lucide-react';
+import { Bell, ChevronRight, Utensils, CheckCircle, TrendingUp } from 'lucide-react';
 import './styles/App.css';
 
 const Dashboard = () => {
-  const { role, user } = useUser();
+  const { role } = useUser();
   const { schoolTasks, points, weeklyMenu, foods, chores } = useData();
   
   if (role === 'child') return <KidZone />;
