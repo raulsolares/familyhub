@@ -37,7 +37,9 @@ const Dashboard = () => {
     .sort((a, b) => a.daysLeft - b.daysLeft)
     .slice(0, 4);
 
-  const today = 'Domingo'; // Mock de día actual
+  const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+  const today = dayNames[new Date().getDay()];
+  
   const todayMeals = weeklyMenu.filter(m => m.day === today);
   const pendingChores = chores.filter(c => c.status === 'Pendiente');
 
@@ -49,8 +51,8 @@ const Dashboard = () => {
           <p className="page-subtitle">Panel de administración familiar premium</p>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <p style={{ fontWeight: '700', fontSize: '1.1rem' }}>{new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
-          <span className="badge badge-blue">Hogar Sincronizado</span>
+          <p style={{ fontWeight: '700', fontSize: '1.1rem', textTransform: 'capitalize' }}>{new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+          <span className="badge badge-blue" style={{ background: 'var(--p-primary)', color: 'white' }}>Hogar Sincronizado</span>
         </div>
       </header>
 
@@ -59,44 +61,44 @@ const Dashboard = () => {
         {/* Widget 1: Centro de Notificaciones (Urgente) */}
         <div className="card" style={{ gridColumn: 'span 8', borderLeft: '4px solid #ef4444' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-            <h3 className="card-title" style={{ margin: 0 }}><Bell size={20} color="#ef4444" /> Notificaciones y Próximos Vencimientos</h3>
+            <h3 className="card-title" style={{ margin: 0 }}><Bell size={20} color="#ef4444" /> Notificaciones y Vencimientos</h3>
             <Link to="/school" style={{ fontSize: '0.8rem', color: 'var(--p-primary)', fontWeight: '700', textDecoration: 'none' }}>Ver todo</Link>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {notifications.map(n => (
-              <div key={n.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: '#fef2f2', borderRadius: '12px', border: '1px solid #fee2e2' }}>
+              <div key={n.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: 'var(--p-background)', borderRadius: '12px', border: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', color: '#ef4444', border: '1px solid #fee2e2' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'var(--p-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', color: '#ef4444', border: '1px solid var(--border)' }}>
                     {n.daysLeft < 0 ? '!' : n.daysLeft}
                   </div>
                   <div>
                     <p style={{ fontWeight: '800', fontSize: '0.95rem' }}>{n.title} ({n.child})</p>
-                    <p style={{ fontSize: '0.8rem', color: '#b91c1c' }}>{n.daysLeft === 0 ? 'Vence HOY' : n.daysLeft < 0 ? 'VENCIDO' : `Faltan ${n.daysLeft} días`}</p>
+                    <p style={{ fontSize: '0.8rem', color: '#ef4444' }}>{n.daysLeft === 0 ? 'Vence HOY' : n.daysLeft < 0 ? 'VENCIDO' : `Faltan ${n.daysLeft} días`}</p>
                   </div>
                 </div>
-                <ChevronRight size={18} color="#fca5a5" />
+                <ChevronRight size={18} color="var(--p-text-muted)" />
               </div>
             ))}
             {notifications.length === 0 && <p style={{ textAlign: 'center', color: 'var(--p-text-muted)', padding: '1rem' }}>No hay pendientes urgentes. ✨</p>}
           </div>
         </div>
 
-        {/* Widget 2: Status de Puntos Niños */}
+        {/* Widget 2: Status de Puntos (Toda la familia) */}
         <div className="card" style={{ gridColumn: 'span 4' }}>
-          <h3 className="card-title"><TrendingUp size={20} color="var(--p-primary)" /> Rendimiento Semanal</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginTop: '1rem' }}>
-            {['Mateo', 'Sofía'].map(kid => (
-              <div key={kid}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                  <span style={{ fontWeight: '700' }}>{kid}</span>
-                  <span style={{ fontWeight: '800', color: 'var(--p-primary)' }}>{points[kid]} pts</span>
+          <h3 className="card-title"><TrendingUp size={20} color="var(--p-primary)" /> Rendimiento Familiar</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
+            {['Alan', 'Aria', 'Raúl', 'Tania'].map(member => (
+              <div key={member}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                  <span style={{ fontWeight: '700', fontSize: '0.85rem' }}>{member}</span>
+                  <span style={{ fontWeight: '800', color: 'var(--p-primary)', fontSize: '0.85rem' }}>{points[member] || 0} pts</span>
                 </div>
-                <div style={{ height: '10px', background: '#f1f5f9', borderRadius: '5px', overflow: 'hidden' }}>
-                  <div style={{ width: `${(points[kid] / 1000) * 100}%`, height: '100%', background: 'var(--p-primary)', borderRadius: '5px' }} />
+                <div style={{ height: '8px', background: 'var(--p-background)', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{ width: `${Math.min(((points[member] || 0) / 1000) * 100, 100)}%`, height: '100%', background: 'var(--p-primary)', borderRadius: '4px' }} />
                 </div>
               </div>
             ))}
-            <Link to="/rewards" className="btn-primary" style={{ textAlign: 'center', textDecoration: 'none', fontSize: '0.85rem' }}>Gestionar Premios</Link>
+            <Link to="/rewards" className="btn-primary" style={{ textAlign: 'center', textDecoration: 'none', fontSize: '0.85rem', marginTop: '0.5rem' }}>Gestionar Premios</Link>
           </div>
         </div>
 
@@ -107,15 +109,15 @@ const Dashboard = () => {
             {['Desayuno', 'Comida', 'Cena'].map(meal => {
               const items = todayMeals.filter(m => m.meal === meal);
               return (
-                <div key={meal} style={{ padding: '0.75rem', background: '#f8fafc', borderRadius: '12px' }}>
-                  <p style={{ fontSize: '0.7rem', fontWeight: '800', color: '#b45309', textTransform: 'uppercase' }}>{meal}</p>
+                <div key={meal} style={{ padding: '0.75rem', background: 'var(--p-background)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                  <p style={{ fontSize: '0.7rem', fontWeight: '800', color: 'var(--p-primary)', textTransform: 'uppercase' }}>{meal}</p>
                   <p style={{ fontWeight: '700', fontSize: '0.9rem' }}>
-                    {items.length > 0 ? foods.find(f => f.id === items[0].foodId)?.name : 'Sin asignar'}
+                    {items.length > 0 ? foods.find(f => f.id === items[0].foodIds[0])?.name : 'Sin asignar'}
                   </p>
                 </div>
               )
             })}
-            <Link to="/menu" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fffbeb', borderRadius: '12px', border: '1px dashed #f59e0b', textDecoration: 'none', color: '#b45309', fontWeight: '700', fontSize: '0.8rem' }}>Ver menú completo</Link>
+            <Link to="/menu" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--p-background)', borderRadius: '12px', border: '1px dashed var(--p-primary)', textDecoration: 'none', color: 'var(--p-primary)', fontWeight: '700', fontSize: '0.8rem' }}>Ver menú completo</Link>
           </div>
         </div>
 
@@ -124,12 +126,12 @@ const Dashboard = () => {
           <h3 className="card-title"><CheckCircle size={20} color="#10b981" /> Tareas del Hogar</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1rem' }}>
             {pendingChores.slice(0, 3).map(c => (
-              <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: '#f0fdf4', borderRadius: '12px', border: '1px solid #dcfce7' }}>
+              <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--p-background)', borderRadius: '12px', border: '1px solid var(--border)' }}>
                 <span style={{ fontWeight: '700', fontSize: '0.9rem' }}>{c.name}</span>
-                <span style={{ fontSize: '0.7rem', fontWeight: '800', background: 'white', padding: '0.1rem 0.5rem', borderRadius: '4px', color: '#166534' }}>{c.user}</span>
+                <span style={{ fontSize: '0.7rem', fontWeight: '800', background: 'var(--p-primary)', padding: '0.1rem 0.5rem', borderRadius: '4px', color: 'white' }}>{c.user}</span>
               </div>
             ))}
-            <Link to="/chores" style={{ textAlign: 'center', fontSize: '0.8rem', color: '#10b981', fontWeight: '700', textDecoration: 'none', marginTop: '0.5rem' }}>Gestionar todas las tareas</Link>
+            <Link to="/chores" style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--p-primary)', fontWeight: '700', textDecoration: 'none', marginTop: '0.5rem' }}>Gestionar todas las tareas</Link>
           </div>
         </div>
 

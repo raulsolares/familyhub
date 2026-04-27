@@ -16,7 +16,7 @@ const SchoolHub = () => {
   const [title, setTitle] = useState('');
   const [desc, setDesc] = useState('');
   const [date, setDate] = useState('');
-  const [type, setType] = useState<'material' | 'academic' | 'social'>('material');
+  const [type, setType] = useState<string>('material');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,12 +100,15 @@ const SchoolHub = () => {
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.4rem' }}>Tipo</label>
-                  <select value={type} onChange={(e) => setType(e.target.value as any)} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #ddd' }}>
-                    <option value="material">Material (Mochila)</option>
-                    <option value="academic">Tarea/Examen</option>
-                    <option value="social">Evento/Convivio</option>
-                  </select>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.4rem' }}>Tipo / Categoría</label>
+                  <input 
+                    required 
+                    value={type} 
+                    onChange={(e) => setType(e.target.value)} 
+                    type="text" 
+                    placeholder="Ej: Examen, Material, Social..."
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--p-background)', color: 'var(--p-text)' }} 
+                  />
                 </div>
               </div>
               <button type="submit" className="btn-primary" style={{ marginTop: '1rem' }}>

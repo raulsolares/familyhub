@@ -1,5 +1,5 @@
-:root {
-  /* Parent Theme (Indigo & Slate) */
+/* Theme: Light (Default) */
+.theme-light {
   --p-primary: #4f46e5;
   --p-primary-hover: #4338ca;
   --p-secondary: #0ea5e9;
@@ -7,10 +7,25 @@
   --p-surface: #ffffff;
   --p-text: #1e293b;
   --p-text-muted: #64748b;
+  --border: rgba(0,0,0,0.08);
+  --shadow-premium: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
 
-.theme-child {
-  /* Child Theme (Playful & Bright) */
+/* Theme: Dark */
+.theme-dark {
+  --p-primary: #818cf8;
+  --p-primary-hover: #6366f1;
+  --p-secondary: #38bdf8;
+  --p-background: #0f172a;
+  --p-surface: #1e293b;
+  --p-text: #f8fafc;
+  --p-text-muted: #94a3b8;
+  --border: rgba(255,255,255,0.1);
+  --shadow-premium: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+}
+
+/* Theme: Fun (Kids) */
+.theme-fun {
   --p-primary: #f43f5e;
   --p-primary-hover: #e11d48;
   --p-secondary: #f59e0b;
@@ -18,14 +33,13 @@
   --p-surface: #ffffff;
   --p-text: #881337;
   --p-text-muted: #be123c;
+  --border: rgba(244, 63, 94, 0.2);
+  --shadow-premium: 0 10px 15px -3px rgba(244, 63, 94, 0.15), 0 4px 6px -2px rgba(244, 63, 94, 0.1);
 }
 
 :root {
   --radius-lg: 16px;
   --radius-md: 12px;
-  --shadow-premium: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  --glass: rgba(255, 255, 255, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.3);
 }
 
 * {

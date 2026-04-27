@@ -2,6 +2,7 @@ import { createContext, useContext, useState } from 'react';
 import type { ReactNode } from 'react';
 
 type Role = 'parent' | 'child';
+type Theme = 'light' | 'dark' | 'fun';
 
 interface User {
   id: string;
@@ -9,6 +10,7 @@ interface User {
   avatar: string;
   role: Role;
   username: string;
+  theme: Theme;
 }
 
 interface UserContextType {
@@ -18,6 +20,7 @@ interface UserContextType {
   login: (username: string, password: string) => boolean;
   logout: () => void;
   isLoggedIn: boolean;
+  updateTheme: (theme: Theme) => void;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -30,22 +33,24 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   });
 
   const login = (username: string, password: string): boolean => {
-    // Mock login logic - in a real app this would call an API
-    if ((username === 'papa' || username === 'mama') && password === '1234') {
-      const newUser: User = { id: '1', name: 'Papá/Mamá', avatar: '👨‍👩‍👧‍👦', role: 'parent', username };
+    if ((username === 'papa' || username === 'mama' || username === 'raul' || username === 'tania') && password === '1234') {
+      const name = username === 'papa' || username === 'raul' ? 'Raúl' : 'Tania';
+      const avatar = name === 'Raúl' ? '👨' : '👩';
+      const newUser: User = { id: username, name, avatar, role: 'parent', username, theme: 'light' };
       setUser(newUser);
       setIsLoggedIn(true);
       localStorage.setItem('fh_auth', 'true');
       localStorage.setItem('fh_user', JSON.stringify(newUser));
       return true;
-    } else if ((username === 'mateo' || username === 'sofia') && password === '1234') {
+    } else if ((username === 'alan' || username === 'aria') && password === '1234') {
       const name = username.charAt(0).toUpperCase() + username.slice(1);
       const newUser: User = { 
-        id: username === 'mateo' ? '2' : '3', 
+        id: username, 
         name, 
-        avatar: username === 'mateo' ? '👦' : '👧', 
+        avatar: username === 'alan' ? '👦' : '👧', 
         role: 'child', 
-        username 
+        username,
+        theme: 'fun'
       };
       setUser(newUser);
       setIsLoggedIn(true);
@@ -71,11 +76,20 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const updateTheme = (theme: Theme) => {
+    if (user) {
+      const updated = { ...user, theme };
+      setUser(updated);
+      localStorage.setItem('fh_user', JSON.stringify(updated));
+    }
+  };
+
   const role = user?.role || 'parent';
+  const currentTheme = user?.theme || 'light';
 
   return (
-    <UserContext.Provider value={{ role, setRole, user, login, logout, isLoggedIn }}>
-      <div className={`theme-${role}`}>
+    <UserContext.Provider value={{ role, setRole, user, login, logout, isLoggedIn, updateTheme }}>
+      <div className={`theme-${currentTheme} role-${role}`} style={{ minHeight: '100vh' }}>
         {children}
       </div>
     </UserContext.Provider>

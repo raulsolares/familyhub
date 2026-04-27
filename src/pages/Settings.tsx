@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { UserPlus, Shield, Clock, Trash2, Edit2, List } from 'lucide-react';
+import { useUser } from '../context/UserContext';
 import { useData } from '../context/DataContext';
 
 const Settings = () => {
+  const { updateTheme } = useUser();
   const { members, rules, routines, chores, addRule, deleteRule, deleteRoutine, addChore, deleteChore } = useData();
+
   
   const [activeTab, setActiveTab] = useState<'members' | 'rules' | 'routines' | 'chores'>('members');
   
@@ -40,6 +43,15 @@ const Settings = () => {
         <h1 className="page-title">Configuración Maestro</h1>
         <p className="page-subtitle">Administra miembros, reglas de convivencia y rutinas familiares</p>
       </header>
+
+      <div className="card" style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem 1.5rem' }}>
+        <span style={{ fontWeight: '700' }}>Tema Visual de tu Sesión</span>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button onClick={() => updateTheme('light')} style={{ padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'white', color: '#1e293b', fontWeight: '700', cursor: 'pointer' }}>Claro</button>
+          <button onClick={() => updateTheme('dark')} style={{ padding: '0.5rem 1rem', borderRadius: '8px', border: 'none', background: '#1e293b', color: 'white', fontWeight: '700', cursor: 'pointer' }}>Oscuro</button>
+          <button onClick={() => updateTheme('fun')} style={{ padding: '0.5rem 1rem', borderRadius: '8px', border: 'none', background: '#f43f5e', color: 'white', fontWeight: '700', cursor: 'pointer' }}>Divertido</button>
+        </div>
+      </div>
 
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
         {[
