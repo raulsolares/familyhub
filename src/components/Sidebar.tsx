@@ -59,10 +59,10 @@ const Sidebar = () => {
             justifyContent: 'center',
             fontSize: '1.2rem'
           }}>
-            {user.avatar}
+            {user?.avatar || '👤'}
           </div>
           <div>
-            <p style={{ fontWeight: '700', fontSize: '0.9rem' }}>{user.name}</p>
+            <p style={{ fontWeight: '700', fontSize: '0.9rem' }}>{user?.name || 'Usuario'}</p>
             <p style={{ fontSize: '0.75rem', color: 'var(--p-text-muted)' }}>
               Modo {role === 'parent' ? 'Padres' : 'Niños'}
             </p>

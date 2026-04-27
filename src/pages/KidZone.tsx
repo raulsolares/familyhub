@@ -7,7 +7,7 @@ const KidZone = () => {
   const { user } = useUser();
   const { points, chores, schoolTasks, toggleChore, toggleSchoolTask } = useData();
 
-  const kidName = user.name === 'Mateo' ? 'Mateo' : 'Sofía';
+  const kidName = user?.name === 'Mateo' ? 'Mateo' : 'Sofía';
   const myPoints = points[kidName] || 0;
   
   const myChores = chores.filter(c => c.user === kidName && c.status === 'Pendiente');
@@ -35,7 +35,7 @@ const KidZone = () => {
           fontSize: '3rem',
           boxShadow: '0 10px 25px rgba(244, 63, 94, 0.3)'
         }}>
-          {user.avatar}
+          {user?.avatar || '👤'}
         </div>
         <h1 style={{ fontSize: '2.5rem', fontWeight: '900', color: 'var(--p-text)' }}>¡Hola, {kidName}!</h1>
         <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginTop: '1rem' }}>
