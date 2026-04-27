@@ -15,12 +15,12 @@ const SchoolHub = () => {
   const [child, setChild] = useState('Mateo');
   const [title, setTitle] = useState('');
   const [desc, setDesc] = useState('');
-  const [deadline, setDeadline] = useState('');
+  const [date, setDate] = useState('');
   const [type, setType] = useState<'material' | 'academic' | 'social'>('material');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const taskData = { child, title, desc, deadline, type };
+    const taskData = { child, title, desc, date, type };
 
     if (editingTask) {
       updateSchoolTask(editingTask.id, taskData);
@@ -35,7 +35,7 @@ const SchoolHub = () => {
     setChild('Mateo');
     setTitle('');
     setDesc('');
-    setDeadline('');
+    setDate('');
     setType('material');
     setEditingTask(null);
     setShowForm(false);
@@ -46,7 +46,7 @@ const SchoolHub = () => {
     setChild(task.child);
     setTitle(task.title);
     setDesc(task.desc);
-    setDeadline(task.deadline);
+    setDate(task.date);
     setType(task.type);
     setShowForm(true);
   };
@@ -59,7 +59,7 @@ const SchoolHub = () => {
       <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1 className="page-title">Módulo Escolar</h1>
-          <p className="page-subtitle">Tareas, materiales y eventos académicos</p>
+          <p className="page-subtitle">Tareas, materiales y eventos académicos con fechas reales</p>
         </div>
         {role === 'parent' && (
           <button className="btn-primary" onClick={() => setShowForm(true)}>+ Agregar Pendiente</button>
@@ -90,8 +90,14 @@ const SchoolHub = () => {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.4rem' }}>Fecha Límite</label>
-                  <input required value={deadline} onChange={(e) => setDeadline(e.target.value)} type="text" placeholder="Ej: Mañana, Viernes..." style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #ddd' }} />
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.4rem' }}>Fecha del Evento</label>
+                  <input 
+                    required 
+                    value={date} 
+                    onChange={(e) => setDate(e.target.value)} 
+                    type="date" 
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #ddd' }} 
+                  />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.4rem' }}>Tipo</label>
@@ -112,7 +118,7 @@ const SchoolHub = () => {
 
       <div className="grid">
         <div className="card" style={{ gridColumn: 'span 2' }}>
-          <h3 className="card-title"><Clock size={20} color="var(--p-primary)" /> Próximos Pendientes (Académicos y Materiales)</h3>
+          <h3 className="card-title"><Clock size={20} color="var(--p-primary)" /> Próximos Pendientes</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
             {pendingTasks.map(item => (
               <div key={item.id} style={{ 
@@ -155,7 +161,7 @@ const SchoolHub = () => {
                     </p>
                     <div style={{ display: 'flex', gap: '1rem' }}>
                       <span style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#ef4444', fontWeight: '600' }}>
-                        <Calendar size={14} /> Límite: {item.deadline}
+                        <Calendar size={14} /> Fecha: {new Date(item.date).toLocaleDateString()}
                       </span>
                       <span style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem', color: 'var(--p-text-muted)' }}>
                         {item.type === 'material' ? <Backpack size={14}/> : <BookOpen size={14}/>} 
@@ -190,7 +196,7 @@ const SchoolHub = () => {
                   <span style={{ fontWeight: '700', color: '#92400e' }}>{item.title}</span>
                   <span style={{ fontSize: '0.6rem', padding: '0.1rem 0.4rem', background: '#fef3c7', color: '#b45309', borderRadius: '4px', fontWeight: '800' }}>{item.child}</span>
                 </div>
-                <p style={{ fontSize: '0.8rem', color: '#b45309' }}>{item.deadline}</p>
+                <p style={{ fontSize: '0.8rem', color: '#b45309' }}>{new Date(item.date).toLocaleDateString()}</p>
                 <p style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>
                   <strong>Detalles:</strong> {item.desc}
                 </p>

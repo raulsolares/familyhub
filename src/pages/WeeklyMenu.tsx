@@ -1,42 +1,85 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useData } from '../context/DataContext';
-import { X } from 'lucide-react';
+import { X, CheckCircle2, User } from 'lucide-react';
 
 const WeeklyMenu = () => {
-  const { weeklyMenu, foods, assignMeal } = useData();
+  const { weeklyMenu, foods, assignMeal, toggleAte } = useData();
 
   const days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
   const meals = ['Desayuno', 'Snack', 'Lunch', 'Comida', 'Merienda', 'Cena'];
+  const members = ['Papá', 'Mamá', 'Mateo', 'Sofía'];
 
   const [showModal, setShowModal] = useState(false);
-  const [selectedSlot, setSelectedSlot] = useState<{ day: string, meal: string } | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<{ day: string, meal: string, member: string } | null>(null);
 
-  const handleSlotClick = (day: string, meal: string) => {
-    setSelectedSlot({ day, meal });
+  const handleSlotClick = (day: string, meal: string, member: string) => {
+    setSelectedSlot({ day, meal, member });
     setShowModal(true);
   };
 
   const handleAssign = (foodId: string) => {
     if (selectedSlot) {
-      assignMeal(selectedSlot.day, selectedSlot.meal, foodId);
+      assignMeal(selectedSlot.day, selectedSlot.meal, foodId, selectedSlot.member);
     }
     setShowModal(false);
     setSelectedSlot(null);
   };
 
-  const getFoodForSlot = (day: string, meal: string) => {
-    const item = weeklyMenu.find(w => w.day === day && w.meal === meal);
-    if (!item) return null;
-    return foods.find(f => f.id === item.foodId);
+  const getFoodForSlot = (day: string, meal: string, member: string) => {
+    return weeklyMenu.find(w => w.day === day && w.meal === meal && w.member === member);
   };
+
+  const today = 'Domingo'; // En producción usaríamos new Date().getDay()
 
   return (
     <div>
       <header className="page-header">
-        <h1 className="page-title">Menú Semanal</h1>
-        <p className="page-subtitle">Asigna platillos de tu catálogo a cada día de la semana</p>
+        <h1 className="page-title">Planificación Alimenticia</h1>
+        <p className="page-subtitle">Menú personalizado para cada miembro de la familia</p>
       </header>
+
+      {/* Vista HOY */}
+      <div className="card" style={{ marginBottom: '2rem', border: '2px solid var(--p-primary)' }}>
+        <h3 className="card-title" style={{ color: 'var(--p-primary)' }}>📅 Resumen de HOY ({today})</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginTop: '1rem' }}>
+          {members.map(member => (
+            <div key={member} style={{ padding: '1rem', background: '#f8fafc', borderRadius: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: 'var(--p-primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 'bold' }}>{member[0]}</div>
+                <h4 style={{ fontWeight: '800' }}>{member}</h4>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {meals.map(meal => {
+                  const slot = getFoodForSlot(today, meal, member);
+                  const food = foods.find(f => f.id === slot?.foodId);
+                  if (!food) return null;
+                  return (
+                    <div 
+                      key={meal} 
+                      onClick={() => slot && toggleAte(slot.id)}
+                      style={{ 
+                        fontSize: '0.8rem', 
+                        padding: '0.5rem', 
+                        background: slot?.ate ? '#dcfce7' : 'white', 
+                        borderRadius: '8px', 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        cursor: 'pointer',
+                        border: '1px solid rgba(0,0,0,0.05)'
+                      }}
+                    >
+                      <span><strong>{meal}:</strong> {food.name}</span>
+                      {slot?.ate ? <CheckCircle2 size={14} color="#166534" /> : <div style={{ width: '12px', height: '12px', borderRadius: '50%', border: '1px solid #cbd5e1' }} />}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* Modal de Asignación */}
       {showModal && selectedSlot && (
@@ -44,7 +87,7 @@ const WeeklyMenu = () => {
           <div className="card" style={{ width: '100%', maxWidth: '400px', position: 'relative' }}>
             <button onClick={() => setShowModal(false)} style={{ position: 'absolute', right: '1rem', top: '1rem', background: 'none', border: 'none', cursor: 'pointer' }}><X /></button>
             <h3 className="card-title" style={{ marginBottom: '1.5rem' }}>
-              {selectedSlot.meal} del {selectedSlot.day}
+               {selectedSlot.meal} - {selectedSlot.member} ({selectedSlot.day})
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '300px', overflowY: 'auto' }}>
               <button onClick={() => handleAssign('')} style={{ padding: '0.75rem', background: '#fecaca', color: '#ef4444', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>
@@ -66,45 +109,57 @@ const WeeklyMenu = () => {
       )}
 
       <div className="card" style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '900px' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1000px' }}>
           <thead>
             <tr>
-              <th style={{ padding: '1rem', borderBottom: '2px solid var(--border)', textAlign: 'left' }}>Comida</th>
+              <th style={{ padding: '1rem', borderBottom: '2px solid var(--border)', textAlign: 'left' }}>Miembro / Comida</th>
               {days.map(day => (
                 <th key={day} style={{ padding: '1rem', borderBottom: '2px solid var(--border)', textAlign: 'center' }}>{day}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {meals.map(meal => (
-              <tr key={meal}>
-                <td style={{ padding: '1rem', borderBottom: '1px solid var(--border)', fontWeight: '600' }}>{meal}</td>
-                {days.map(day => {
-                  const food = getFoodForSlot(day, meal);
-                  return (
-                    <td key={`${day}-${meal}`} style={{ padding: '0.5rem', borderBottom: '1px solid var(--border)', textAlign: 'center' }}>
-                      <div 
-                        onClick={() => handleSlotClick(day, meal)}
-                        style={{ 
-                          padding: '0.5rem', 
-                          backgroundColor: food ? '#eef2ff' : '#f1f5f9', 
-                          color: food ? 'var(--p-primary)' : 'var(--p-text-muted)',
-                          borderRadius: '8px', 
-                          fontSize: '0.8rem',
-                          minHeight: '60px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer',
-                          border: food ? '1px solid #c7d2fe' : '1px dashed #cbd5e1',
-                          fontWeight: food ? '700' : '400'
-                        }}>
-                        {food ? food.name : '+ Agregar'}
-                      </div>
-                    </td>
-                  )
-                })}
-              </tr>
+            {members.map(member => (
+              <React.Fragment key={member}>
+                <tr style={{ background: '#f1f5f9' }}>
+                  <td colSpan={8} style={{ padding: '0.5rem 1rem', fontWeight: '800', fontSize: '0.9rem', color: 'var(--p-primary)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <User size={16} /> {member}
+                    </div>
+                  </td>
+                </tr>
+                {meals.map(meal => (
+                  <tr key={`${member}-${meal}`}>
+                    <td style={{ padding: '0.75rem 1.5rem', borderBottom: '1px solid var(--border)', fontSize: '0.85rem', fontWeight: '600' }}>{meal}</td>
+                    {days.map(day => {
+                      const slot = getFoodForSlot(day, meal, member);
+                      const food = foods.find(f => f.id === slot?.foodId);
+                      return (
+                        <td key={`${day}-${meal}-${member}`} style={{ padding: '0.25rem', borderBottom: '1px solid var(--border)', textAlign: 'center' }}>
+                          <div 
+                            onClick={() => handleSlotClick(day, meal, member)}
+                            style={{ 
+                              padding: '0.4rem', 
+                              backgroundColor: food ? '#eef2ff' : '#f8fafc', 
+                              color: food ? 'var(--p-primary)' : '#cbd5e1',
+                              borderRadius: '8px', 
+                              fontSize: '0.75rem',
+                              minHeight: '45px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              border: food ? '1px solid #c7d2fe' : '1px dashed #e2e8f0',
+                              fontWeight: food ? '700' : '400'
+                            }}>
+                            {food ? food.name : '+'}
+                          </div>
+                        </td>
+                      )
+                    })}
+                  </tr>
+                ))}
+              </React.Fragment>
             ))}
           </tbody>
         </table>
@@ -112,33 +167,22 @@ const WeeklyMenu = () => {
 
       <div style={{ marginTop: '2rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
         <div className="card">
-          <h3 className="card-title">📖 Mis Recetas / Alimentos</h3>
+          <h3 className="card-title">📖 Catálogo de Alimentos</h3>
           <p style={{ color: 'var(--p-text-muted)', fontSize: '0.9rem', marginBottom: '1rem' }}>
-            Gestiona tus platillos favoritos y agrégales ingredientes para la lista de compras.
+            Gestiona los ingredientes detallados para tu lista de súper.
           </p>
           <Link to="/food">
-            <button className="btn-primary">
-              Ir al Catálogo de Alimentos
-            </button>
+            <button className="btn-primary">Ir al Catálogo</button>
           </Link>
         </div>
-
         <div className="card">
-          <h3 className="card-title">🛒 Lista de Súper Automática</h3>
+          <h3 className="card-title">🛒 Lista de Súper Inteligente</h3>
           <p style={{ color: 'var(--p-text-muted)', fontSize: '0.9rem', marginBottom: '1rem' }}>
-            Se genera basada en todos los ingredientes del menú asignado arriba.
+            Calcula automáticamente las cantidades basadas en todo el menú familiar.
           </p>
           <Link to="/shopping">
-            <button style={{ 
-              padding: '0.75rem 1rem', 
-              backgroundColor: 'white', 
-              color: 'var(--p-primary)', 
-              border: '2px solid var(--p-primary)', 
-              borderRadius: 'var(--radius-md)',
-              cursor: 'pointer',
-              fontWeight: '600'
-            }}>
-              Ver Lista de Compras
+            <button style={{ padding: '0.75rem 1rem', backgroundColor: 'white', color: 'var(--p-primary)', border: '2px solid var(--p-primary)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontWeight: '600' }}>
+              Ver Lista
             </button>
           </Link>
         </div>

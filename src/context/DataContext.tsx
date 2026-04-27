@@ -1,12 +1,27 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 
-// Interfaces
+// Interfaces Extendidas
+export interface Ingredient {
+  name: string;
+  amount: number;
+  unit: string;
+}
+
 export interface Food {
   id: string;
   name: string;
   category: string;
-  ingredients: string[];
+  ingredients: Ingredient[];
+}
+
+export interface WeeklyMenuItem {
+  id: string;
+  day: string;
+  meal: string;
+  foodId: string;
+  member: string;
+  ate: boolean;
 }
 
 export interface Chore {
@@ -18,162 +33,230 @@ export interface Chore {
   points: number;
 }
 
+export interface Routine {
+  id: string;
+  member: string;
+  name: string;
+  time: string;
+  tasks: string[];
+}
+
 export interface SchoolTask {
   id: string;
   child: string;
   title: string;
   desc: string;
-  deadline: string;
+  date: string;
   type: 'material' | 'academic' | 'social';
   completed: boolean;
 }
 
-export interface WeeklyMenuItem {
-  day: string;
-  meal: string;
-  foodId: string;
+export interface Rule {
+  id: string;
+  description: string;
+  points: number; // Positivo para premio, negativo para consecuencia
+  category: 'Comida' | 'Hogar' | 'Escuela' | 'Conducta';
 }
 
-export interface Reward {
+export interface PointLog {
+  id: string;
+  member: string;
+  description: string;
+  points: number;
+  date: string;
+}
+
+export interface Member {
   id: string;
   name: string;
-  cost: number;
-  icon: string;
+  role: 'parent' | 'child';
+  avatar: string;
 }
 
 interface DataContextType {
   foods: Food[];
   chores: Chore[];
   schoolTasks: SchoolTask[];
-  rewards: Reward[];
-  points: { [key: string]: number };
   weeklyMenu: WeeklyMenuItem[];
+  rules: Rule[];
+  pointLogs: PointLog[];
+  members: Member[];
+  routines: Routine[];
+  points: { [key: string]: number };
+  
+  // Acciones
   addFood: (food: Omit<Food, 'id'>) => void;
-  deleteFood: (id: string) => void;
   updateFood: (id: string, food: Partial<Food>) => void;
+  deleteFood: (id: string) => void;
+  
+  addChore: (chore: Omit<Chore, 'id' | 'status'>) => void;
+  updateChore: (id: string, chore: Partial<Chore>) => void;
+  deleteChore: (id: string) => void;
   toggleChore: (id: string) => void;
-  addChore: (chore: Omit<Chore, 'id' | 'status' | 'points'>) => void;
-  addSchoolTask: (task: Omit<SchoolTask, 'id' | 'completed'>) => void;
+
+  addRule: (rule: Omit<Rule, 'id'>) => void;
+  deleteRule: (id: string) => void;
+  
+  addPointLog: (log: Omit<PointLog, 'id' | 'date'>) => void;
+  deletePointLog: (id: string) => void;
+  
+  updateMember: (id: string, member: Partial<Member>) => void;
+  
+  addRoutine: (routine: Omit<Routine, 'id'>) => void;
+  updateRoutine: (id: string, routine: Partial<Routine>) => void;
+  deleteRoutine: (id: string) => void;
+
+  assignMeal: (day: string, meal: string, foodId: string, member: string) => void;
+  toggleAte: (id: string) => void;
   updateSchoolTask: (id: string, task: Partial<SchoolTask>) => void;
+  addSchoolTask: (task: Omit<SchoolTask, 'id' | 'completed'>) => void;
   deleteSchoolTask: (id: string) => void;
   toggleSchoolTask: (id: string) => void;
-  updatePoints: (child: string, amount: number) => void;
-  assignMeal: (day: string, meal: string, foodId: string) => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export const DataProvider = ({ children }: { children: ReactNode }) => {
-  // Inicialización con datos de ejemplo o LocalStorage
-  const [foods, setFoods] = useState<Food[]>(() => {
-    const saved = localStorage.getItem('fh_foods');
+  const [members, setMembers] = useState<Member[]>(() => {
+    const saved = localStorage.getItem('fh_members_v7');
     return saved ? JSON.parse(saved) : [
-      { id: '1', name: 'Enchiladas Verdes', category: 'Comida', ingredients: ['Tortillas', 'Pollo', 'Salsa Verde'] },
-      { id: '2', name: 'Avena con Fruta', category: 'Desayuno', ingredients: ['Avena', 'Leche', 'Plátano'] }
+      { id: '1', name: 'Raúl', role: 'parent', avatar: '👨' },
+      { id: '2', name: 'Tania', role: 'parent', avatar: '👩' },
+      { id: '3', name: 'Alan', role: 'child', avatar: '👦' },
+      { id: '4', name: 'Aria', role: 'child', avatar: '👧' }
     ];
   });
 
-  const [chores, setChores] = useState<Chore[]>(() => {
-    const saved = localStorage.getItem('fh_chores');
+  const [rules, setRules] = useState<Rule[]>(() => {
+    const saved = localStorage.getItem('fh_rules_v7');
     return saved ? JSON.parse(saved) : [
-      { id: '1', name: 'Lavar los platos', user: 'Papá', freq: 'Diario', status: 'Pendiente', points: 10 },
-      { id: '2', name: 'Sacar la basura', user: 'Mateo', freq: 'Mar/Jue', status: 'Hecho', points: 20 }
+      { id: '1', description: 'No comer la comida', points: -50, category: 'Comida' },
+      { id: '2', description: 'No sacar la basura', points: -20, category: 'Hogar' },
+      { id: '3', description: 'Ayudar a alguien', points: 30, category: 'Conducta' }
     ];
   });
 
-  const [schoolTasks, setSchoolTasks] = useState<SchoolTask[]>(() => {
-    const saved = localStorage.getItem('fh_school');
-    return saved ? JSON.parse(saved) : [
-      { id: '1', child: 'Mateo', title: 'Cartulina blanca', desc: 'Proyecto Ciencias', deadline: 'Mañana', type: 'material', completed: false }
-    ];
-  });
-
-  const [points, setPoints] = useState<{ [key: string]: number }>(() => {
-    const saved = localStorage.getItem('fh_points');
-    return saved ? JSON.parse(saved) : { Mateo: 450, Sofía: 520 };
-  });
-
-  const [rewards] = useState<Reward[]>([
-    { id: '1', name: '1 hora de videojuegos', cost: 100, icon: '🎮' },
-    { id: '2', name: 'Cena favorita', cost: 500, icon: '🍕' }
-  ]);
-
-  const [weeklyMenu, setWeeklyMenu] = useState<WeeklyMenuItem[]>(() => {
-    const saved = localStorage.getItem('fh_weeklyMenu');
+  const [pointLogs, setPointLogs] = useState<PointLog[]>(() => {
+    const saved = localStorage.getItem('fh_pointlogs_v7');
     return saved ? JSON.parse(saved) : [];
   });
 
-  // Persistencia
-  useEffect(() => {
-    localStorage.setItem('fh_foods', JSON.stringify(foods));
-    localStorage.setItem('fh_chores', JSON.stringify(chores));
-    localStorage.setItem('fh_school', JSON.stringify(schoolTasks));
-    localStorage.setItem('fh_points', JSON.stringify(points));
-    localStorage.setItem('fh_weeklyMenu', JSON.stringify(weeklyMenu));
-  }, [foods, chores, schoolTasks, points, weeklyMenu]);
+  const [routines, setRoutines] = useState<Routine[]>(() => {
+    const saved = localStorage.getItem('fh_routines_v7');
+    return saved ? JSON.parse(saved) : [
+      { id: '1', member: 'Alan', name: 'Rutina Mañanera', time: '07:00', tasks: ['Hacer cama', 'Dientes'] }
+    ];
+  });
 
-  // Acciones
-  const addFood = (food: Omit<Food, 'id'>) => {
-    setFoods([...foods, { ...food, id: Date.now().toString() }]);
+  const [foods, setFoods] = useState<Food[]>(() => {
+    const saved = localStorage.getItem('fh_foods_v7');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [weeklyMenu, setWeeklyMenu] = useState<WeeklyMenuItem[]>(() => {
+    const saved = localStorage.getItem('fh_weeklyMenu_v7');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [chores, setChores] = useState<Chore[]>(() => {
+    const saved = localStorage.getItem('fh_chores_v7');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [schoolTasks, setSchoolTasks] = useState<SchoolTask[]>(() => {
+    const saved = localStorage.getItem('fh_school_v7');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // Persistencia Centralizada
+  useEffect(() => {
+    localStorage.setItem('fh_members_v7', JSON.stringify(members));
+    localStorage.setItem('fh_rules_v7', JSON.stringify(rules));
+    localStorage.setItem('fh_pointlogs_v7', JSON.stringify(pointLogs));
+    localStorage.setItem('fh_routines_v7', JSON.stringify(routines));
+    localStorage.setItem('fh_foods_v7', JSON.stringify(foods));
+    localStorage.setItem('fh_weeklyMenu_v7', JSON.stringify(weeklyMenu));
+    localStorage.setItem('fh_chores_v7', JSON.stringify(chores));
+    localStorage.setItem('fh_school_v7', JSON.stringify(schoolTasks));
+  }, [members, rules, pointLogs, routines, foods, weeklyMenu, chores, schoolTasks]);
+
+  // Cálculos dinámicos de puntos
+  const points = members.reduce((acc, m) => {
+    const total = pointLogs
+      .filter(log => log.member === m.name)
+      .reduce((sum, log) => sum + log.points, 0);
+    acc[m.name] = total;
+    return acc;
+  }, {} as { [key: string]: number });
+
+  // Implementación de Acciones
+  const addPointLog = (log: Omit<PointLog, 'id' | 'date'>) => {
+    setPointLogs([...pointLogs, { ...log, id: Date.now().toString(), date: new Date().toISOString() }]);
   };
 
+  const deletePointLog = (id: string) => setPointLogs(pointLogs.filter(l => l.id !== id));
+
+  const addRule = (rule: Omit<Rule, 'id'>) => setRules([...rules, { ...rule, id: Date.now().toString() }]);
+  const deleteRule = (id: string) => setRules(rules.filter(r => r.id !== id));
+
+  const addFood = (food: Omit<Food, 'id'>) => setFoods([...foods, { ...food, id: Date.now().toString() }]);
+  const updateFood = (id: string, updated: Partial<Food>) => setFoods(foods.map(f => f.id === id ? { ...f, ...updated } as Food : f));
   const deleteFood = (id: string) => setFoods(foods.filter(f => f.id !== id));
 
-  const updateFood = (id: string, updated: Partial<Food>) => {
-    setFoods(foods.map(f => f.id === id ? { ...f, ...updated } : f));
-  };
-
+  const addChore = (chore: Omit<Chore, 'id' | 'status'>) => setChores([...chores, { ...chore, id: Date.now().toString(), status: 'Pendiente' }]);
+  const updateChore = (id: string, updated: Partial<Chore>) => setChores(chores.map(c => c.id === id ? { ...c, ...updated } as Chore : c));
+  const deleteChore = (id: string) => setChores(chores.filter(c => c.id !== id));
   const toggleChore = (id: string) => {
     setChores(chores.map(c => {
       if (c.id === id) {
-        const newStatus = c.status === 'Hecho' ? 'Pendiente' : 'Hecho';
-        // Si se marca como hecho, dar puntos (si es Mateo o Sofía)
-        if (newStatus === 'Hecho' && (c.user === 'Mateo' || c.user === 'Sofía')) {
-          updatePoints(c.user, 20);
+        const isCompleting = c.status === 'Pendiente';
+        if (isCompleting && (c.user === 'Alan' || c.user === 'Aria')) {
+          addPointLog({ member: c.user, description: `Tarea cumplida: ${c.name}`, points: c.points });
         }
-        return { ...c, status: newStatus as 'Hecho' | 'Pendiente' };
+        return { ...c, status: isCompleting ? 'Hecho' : 'Pendiente' };
       }
       return c;
     }));
   };
 
-  const addChore = (chore: Omit<Chore, 'id' | 'status' | 'points'>) => {
-    setChores([...chores, { ...chore, id: Date.now().toString(), status: 'Pendiente', points: 20 }]);
-  };
+  const addRoutine = (r: Omit<Routine, 'id'>) => setRoutines([...routines, { ...r, id: Date.now().toString() }]);
+  const updateRoutine = (id: string, r: Partial<Routine>) => setRoutines(routines.map(item => item.id === id ? { ...item, ...r } as Routine : item));
+  const deleteRoutine = (id: string) => setRoutines(routines.filter(r => r.id !== id));
 
-  const addSchoolTask = (task: Omit<SchoolTask, 'id' | 'completed'>) => {
-    setSchoolTasks([...schoolTasks, { ...task, id: Date.now().toString(), completed: false }]);
-  };
-
-  const updateSchoolTask = (id: string, updated: Partial<SchoolTask>) => {
-    setSchoolTasks(schoolTasks.map(t => t.id === id ? { ...t, ...updated } : t));
-  };
-
-  const deleteSchoolTask = (id: string) => {
-    setSchoolTasks(schoolTasks.filter(t => t.id !== id));
-  };
-
-  const toggleSchoolTask = (id: string) => {
-    setSchoolTasks(schoolTasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
-  };
-
-  const updatePoints = (child: string, amount: number) => {
-    setPoints(prev => ({ ...prev, [child]: (prev[child] || 0) + amount }));
-  };
-
-  const assignMeal = (day: string, meal: string, foodId: string) => {
+  const assignMeal = (day: string, meal: string, foodId: string, member: string) => {
     setWeeklyMenu(prev => {
-      const filtered = prev.filter(item => !(item.day === day && item.meal === meal));
+      const filtered = prev.filter(item => !(item.day === day && item.meal === meal && item.member === member));
       if (!foodId) return filtered;
-      return [...filtered, { day, meal, foodId }];
+      return [...filtered, { id: Date.now().toString(), day, meal, foodId, member, ate: false }];
     });
   };
 
+  const toggleAte = (id: string) => {
+    setWeeklyMenu(prev => prev.map(item => {
+      if (item.id === id) {
+        const isEating = !item.ate;
+        if (isEating && (item.member === 'Alan' || item.member === 'Aria')) {
+          addPointLog({ member: item.member, description: `Logro: Comió todo su ${item.meal}`, points: 10 });
+        }
+        return { ...item, ate: isEating };
+      }
+      return item;
+    }));
+  };
+
+  const updateSchoolTask = (id: string, t: Partial<SchoolTask>) => setSchoolTasks(schoolTasks.map(item => item.id === id ? { ...item, ...t } as SchoolTask : item));
+  const addSchoolTask = (t: Omit<SchoolTask, 'id' | 'completed'>) => setSchoolTasks([...schoolTasks, { ...t, id: Date.now().toString(), completed: false }]);
+  const deleteSchoolTask = (id: string) => setSchoolTasks(schoolTasks.filter(t => t.id !== id));
+  const toggleSchoolTask = (id: string) => setSchoolTasks(schoolTasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
+
+  const updateMember = (id: string, m: Partial<Member>) => setMembers(members.map(item => item.id === id ? { ...item, ...m } as Member : item));
+
   return (
     <DataContext.Provider value={{ 
-      foods, chores, schoolTasks, rewards, points, weeklyMenu,
-      addFood, deleteFood, updateFood, toggleChore, addChore,
-      addSchoolTask, updateSchoolTask, deleteSchoolTask, toggleSchoolTask, updatePoints, assignMeal 
+      foods, chores, schoolTasks, weeklyMenu, rules, pointLogs, members, routines, points,
+      addFood, updateFood, deleteFood, addChore, updateChore, deleteChore, toggleChore,
+      addRule, deleteRule, addPointLog, deletePointLog, updateMember, addRoutine, updateRoutine, deleteRoutine,
+      assignMeal, toggleAte, updateSchoolTask, addSchoolTask, deleteSchoolTask, toggleSchoolTask
     }}>
       {children}
     </DataContext.Provider>
