@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useData } from '../context/DataContext';
 import { Trophy, Star, ArrowLeft, CheckCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import type { Routine } from '../context/DataContext';
 
 const KidDuel = () => {
   const { routines, points, routineLogs, toggleRoutineTask } = useData();
@@ -10,7 +11,7 @@ const KidDuel = () => {
   const todayDate = new Date().toISOString().split('T')[0];
 
   const getKidRoutines = (name: string) => {
-    return routines.filter(r => r.member === name);
+    return routines.filter((r: Routine) => r.member === name);
   };
 
   const alanRoutines = getKidRoutines('Alan');
@@ -18,16 +19,14 @@ const KidDuel = () => {
 
   const handleTaskComplete = (routineId: string, taskIndex: number, kidName: string, totalTasks: number) => {
     const isTaskDone = routineLogs.includes(`${todayDate}_${routineId}_${taskIndex}`);
-    if (isTaskDone) return; // En el duelo, los niños solo pueden "hacer" tareas, no desmarcarlas para evitar trampas.
+    if (isTaskDone) return; 
     
     toggleRoutineTask(routineId, taskIndex, kidName);
 
-    // Sonido de check
     const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3');
     audio.volume = 0.5;
     audio.play().catch(() => {});
 
-    // Mostrar celebración si es la última tarea
     const routineTasksDone = routineLogs.filter(k => k.startsWith(`${todayDate}_${routineId}_`)).length;
     if (routineTasksDone + 1 === totalTasks) {
       setCelebration(kidName);
@@ -44,7 +43,6 @@ const KidDuel = () => {
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#0f172a', margin: '-2.5rem', position: 'relative', overflow: 'hidden' }}>
       
-      {/* Header Duatlón */}
       <header style={{ padding: '1rem 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)' }}>
         <Link to="/" style={{ color: 'white', textDecoration: 'none' }}><ArrowLeft /></Link>
         <h1 style={{ color: 'white', fontSize: '1.5rem', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -53,7 +51,6 @@ const KidDuel = () => {
         <div style={{ width: '40px' }} />
       </header>
 
-      {/* Pantalla Dividida */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         
         {/* Lado Alan */}
@@ -66,7 +63,7 @@ const KidDuel = () => {
           </div>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            {alanRoutines.map(routine => {
+            {alanRoutines.map((routine: Routine) => {
               const done = isRoutineDone(routine.id, routine.tasks.length);
               return (
                 <div key={routine.id} style={{ background: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: '0 8px 0 #c7d2fe', opacity: done ? 0.6 : 1 }}>
@@ -103,7 +100,7 @@ const KidDuel = () => {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            {ariaRoutines.map(routine => {
+            {ariaRoutines.map((routine: Routine) => {
               const done = isRoutineDone(routine.id, routine.tasks.length);
               return (
                 <div key={routine.id} style={{ background: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: '0 8px 0 #fecdd3', opacity: done ? 0.6 : 1 }}>

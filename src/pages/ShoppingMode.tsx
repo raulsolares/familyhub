@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { CheckCircle2, Circle, ArrowLeft, MessageSquare } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useData } from '../context/DataContext';
+import type { Food, Product } from '../context/DataContext';
 
 interface ShoppingItem {
   id: string;
@@ -23,9 +24,9 @@ const ShoppingMode = () => {
     const aggregation = new Map<string, { name: string, qty: number, unit: string }>();
     
     weeklyMenu.forEach(slot => {
-      const food = foods.find(f => f.id === slot.foodIds[0]); // Para demo
-      if (food) {
-        food.ingredients.forEach(ing => {
+      slot.foodIds.forEach(fid => {
+        const food = foods.find((f: Food) => f.id === fid);
+        food?.ingredients.forEach(ing => {
           const key = `${ing.name.toLowerCase()}_${ing.unit}`;
           const existing = aggregation.get(key);
           if (existing) {
@@ -34,25 +35,25 @@ const ShoppingMode = () => {
             aggregation.set(key, { name: ing.name, qty: ing.amount, unit: ing.unit });
           }
         });
-      }
+      });
     });
 
     const menuItems: ShoppingItem[] = Array.from(aggregation.values()).map((val, idx) => {
-      const catMatch = products.find(p => p.name.toLowerCase() === val.name.toLowerCase());
-      const estPrice = catMatch ? (val.qty / catMatch.defaultQty) * catMatch.price : 0;
+      const prod = products.find((p: Product) => p.name.toLowerCase() === val.name.toLowerCase());
+      const estPrice = prod ? (val.qty / prod.defaultQty) * prod.price : 0;
       return {
         id: `menu_${idx}`,
         name: val.name,
         qty: val.qty,
         unit: val.unit,
         price: estPrice,
-        category: catMatch?.category || 'Despensa',
+        category: prod?.category || 'Despensa',
         fromMenu: true,
         bought: false
       };
     });
 
-    // 2. Obtener lista manual
+    // 2. Obtener lista manual (backup local por si no hay nube)
     const savedManual = localStorage.getItem('fh_manual_shopping_v8');
     const manualItems: ShoppingItem[] = savedManual ? JSON.parse(savedManual) : [];
 
@@ -149,11 +150,11 @@ const ShoppingMode = () => {
         alignItems: 'center'
       }}>
         <div>
-          <p style={{ fontSize: '0.75rem', opacity: 0.9, fontWeight: '600' }}>Progreso: {boughtCount} de {items.length}</p>
+          <p style={{ fontSize: '0.75rem', opacity: 0.9, fontWeight: '600' }}>Llevas {boughtCount} de {items.length}</p>
           <p style={{ fontSize: '1.25rem', fontWeight: '900' }}>Total: ${totalBought.toFixed(2)}</p>
         </div>
         <Link to="/shopping" style={{ textDecoration: 'none' }}>
-          <button style={{ background: 'white', color: 'var(--p-primary)', border: 'none', padding: '0.75rem 1rem', borderRadius: '12px', fontWeight: '800', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' }}>
+          <button style={{ background: 'white', color: 'var(--p-primary)', border: 'none', padding: '0.75rem 1rem', borderRadius: '12px', fontWeight: '800', cursor: 'pointer' }}>
             Terminar
           </button>
         </Link>

@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Tag, ShoppingBasket, X, Save, Edit2, MessageSquare, Trash2, Plus, Download } from 'lucide-react';
+import { Tag, ShoppingBasket, X, Save, Edit2, MessageSquare, Trash2, Plus } from 'lucide-react';
 import { useData } from '../context/DataContext';
-import type { Product } from '../context/DataContext';
+import type { Product, Food } from '../context/DataContext';
 
 interface ShoppingItem {
   id: string;
@@ -32,11 +32,11 @@ const ShoppingList = () => {
   const categories = ['Frutas y Verduras', 'Proteínas', 'Lácteos', 'Abarrotes', 'Limpieza', 'Higiene', 'Otros'];
 
   // Agregación de ingredientes del menú
-  const getMenuItems = () => {
+  const getMenuItems = (): ShoppingItem[] => {
     const aggregation = new Map<string, { name: string, qty: number, unit: string }>();
     weeklyMenu.forEach(slot => {
       slot.foodIds.forEach(fid => {
-        const food = foods.find(f => f.id === fid);
+        const food = foods.find((f: Food) => f.id === fid);
         food?.ingredients.forEach(ing => {
           const key = `${ing.name.toLowerCase()}_${ing.unit}`;
           const existing = aggregation.get(key);
@@ -47,7 +47,7 @@ const ShoppingList = () => {
     });
 
     return Array.from(aggregation.values()).map((val, idx) => {
-      const prod = products.find(p => p.name.toLowerCase() === val.name.toLowerCase());
+      const prod = products.find((p: Product) => p.name.toLowerCase() === val.name.toLowerCase());
       return {
         id: `menu_${idx}`,
         name: val.name,
@@ -75,7 +75,7 @@ const ShoppingList = () => {
     setPName(''); setPPrice(0); setPQty(1); setEditingProduct(null); setShowProductForm(false);
   };
 
-  const quickAddToCatalog = (item: any) => {
+  const quickAddToCatalog = (item: ShoppingItem) => {
     setPName(item.name); setPUnit(item.unit); setPQty(1); setActiveTab('catalog'); setShowProductForm(true);
   };
 
@@ -113,7 +113,7 @@ const ShoppingList = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead><tr style={{ borderBottom: '2px solid var(--border)', textAlign: 'left' }}><th style={{ padding: '1rem' }}>Producto</th><th style={{ padding: '1rem' }}>Precio Base</th><th style={{ padding: '1rem' }}>Categoría</th><th style={{ padding: '1rem' }}></th></tr></thead>
               <tbody>
-                {products.map(p => (
+                {products.map((p: Product) => (
                   <tr key={p.id} style={{ borderBottom: '1px solid var(--border)' }}>
                     <td style={{ padding: '1rem', fontWeight: '700' }}>{p.name} <span style={{ fontSize: '0.6rem', color: 'var(--p-text-muted)' }}>({p.defaultQty}{p.unit})</span></td>
                     <td style={{ padding: '1rem', fontWeight: '800', color: 'var(--p-primary)' }}>${p.price.toFixed(2)}</td>
@@ -166,7 +166,7 @@ const ShoppingList = () => {
                 <button type="submit" className="btn-primary" style={{ padding: '0.6rem' }}><Plus size={20}/></button>
               </form>
               <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {shoppingNotes.map(n => (
+                {shoppingNotes.map((n: any) => (
                   <div key={n.id} style={{ background: '#fffbeb', padding: '0.8rem', borderRadius: '12px', border: '1px dashed #f59e0b', fontSize: '0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontWeight: '600', color: '#92400e' }}>{n.text}</span>
                     <button onClick={() => deleteShoppingNote(n.id)} style={{ background: 'none', border: 'none', color: '#b45309', cursor: 'pointer' }}><X size={16}/></button>

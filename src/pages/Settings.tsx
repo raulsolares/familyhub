@@ -1,20 +1,27 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { UserPlus, Shield, Clock, Trash2, Edit2, List } from 'lucide-react';
-import { useUser } from '../context/UserContext';
+import { UserPlus, Shield, Clock, Trash2, Edit2, List, Save } from 'lucide-react';
 import { useData } from '../context/DataContext';
+import { useUser } from '../context/UserContext';
+import type { Member, Rule, Routine, Chore } from '../context/DataContext';
 
 const Settings = () => {
   const { updateTheme } = useUser();
-  const { members, rules, routines, chores, addRule, deleteRule, deleteRoutine, addChore, deleteChore } = useData();
-
+  const { 
+    members, rules, routines, chores, 
+    addRule, updateRule, deleteRule, 
+    deleteRoutine, 
+    addChore, deleteChore, updateMember 
+  } = useData();
   
   const [activeTab, setActiveTab] = useState<'members' | 'rules' | 'routines' | 'chores'>('members');
   
   // Form states
   const [showRuleForm, setShowRuleForm] = useState(false);
+  const [editingRule, setEditingRule] = useState<Rule | null>(null);
   const [ruleDesc, setRuleDesc] = useState('');
   const [rulePoints, setRulePoints] = useState(0);
+  const [ruleCat, setRuleCat] = useState('Conducta');
 
   const [showChoreForm, setShowChoreForm] = useState(false);
   const [choreName, setChoreName] = useState('');
@@ -22,12 +29,13 @@ const Settings = () => {
   const [chorePoints, setChorePoints] = useState(20);
   const [choreFreq] = useState('Diario');
 
-  const handleAddRule = (e: FormEvent) => {
+  const handleRuleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    addRule({ description: ruleDesc, points: rulePoints, category: 'Conducta' });
-    setRuleDesc('');
-    setRulePoints(0);
-    setShowRuleForm(false);
+    const payload = { description: ruleDesc, points: rulePoints, category: ruleCat };
+    if (editingRule) updateRule(editingRule.id, payload);
+    else addRule(payload);
+    
+    setRuleDesc(''); setRulePoints(0); setEditingRule(null); setShowRuleForm(false);
   };
 
   const handleAddChore = (e: FormEvent) => {
@@ -80,14 +88,14 @@ const Settings = () => {
       {/* Gestión de Miembros */}
       {activeTab === 'members' && (
         <div className="grid">
-          {members.map(m => (
+          {members.map((m: Member) => (
             <div key={m.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
               <div style={{ fontSize: '2.5rem' }}>{m.avatar}</div>
               <div style={{ flex: 1 }}>
                 <h3 style={{ fontWeight: '800' }}>{m.name}</h3>
                 <p style={{ fontSize: '0.8rem', color: 'var(--p-text-muted)' }}>Rol: {m.role === 'parent' ? 'Administrador' : 'Hijo'}</p>
               </div>
-              <button className="btn-primary" style={{ padding: '0.5rem' }}><Edit2 size={14}/></button>
+              <button onClick={() => updateMember(m.id, {})} className="btn-primary" style={{ padding: '0.5rem' }}><Edit2 size={14}/></button>
             </div>
           ))}
         </div>
@@ -98,22 +106,21 @@ const Settings = () => {
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
             <h3 className="card-title" style={{ margin: 0 }}>Reglas de Puntaje</h3>
-            <button onClick={() => setShowRuleForm(true)} className="btn-primary">+ Nueva Regla</button>
+            <button onClick={() => { setEditingRule(null); setShowRuleForm(true); }} className="btn-primary">+ Nueva Regla</button>
           </div>
 
           {showRuleForm && (
-            <form onSubmit={handleAddRule} style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '12px', marginBottom: '1.5rem', border: '1px solid #e2e8f0' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 100px', gap: '1rem' }}>
-                <input required placeholder="Descripción de la regla..." value={ruleDesc} onChange={e => setRuleDesc(e.target.value)} style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid #ddd' }} />
-                <input required type="number" placeholder="Puntos" value={rulePoints} onChange={e => setRulePoints(Number(e.target.value))} style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid #ddd' }} />
-                <button type="submit" className="btn-primary">Añadir</button>
-              </div>
+            <form onSubmit={handleRuleSubmit} style={{ background: 'var(--p-background)', padding: '1.5rem', borderRadius: '12px', marginBottom: '1.5rem', border: '1px solid var(--border)', display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 100px', gap: '1rem', alignItems: 'end' }}>
+              <div><label style={{ fontSize: '0.75rem', fontWeight: '700' }}>Descripción</label><input required value={ruleDesc} onChange={e => setRuleDesc(e.target.value)} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border)' }} /></div>
+              <div><label style={{ fontSize: '0.75rem', fontWeight: '700' }}>Puntos</label><input required type="number" value={rulePoints} onChange={e => setRulePoints(Number(e.target.value))} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border)' }} /></div>
+              <div><label style={{ fontSize: '0.75rem', fontWeight: '700' }}>Categoría</label><select value={ruleCat} onChange={e => setRuleCat(e.target.value)} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border)' }}><option>Comida</option><option>Hogar</option><option>Conducta</option><option>Escuela</option></select></div>
+              <button type="submit" className="btn-primary" style={{ padding: '0.5rem' }}><Save size={18}/></button>
             </form>
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {rules.map(r => (
-              <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: '#f8fafc', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.05)' }}>
+            {rules.map((r: Rule) => (
+              <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: 'var(--p-background)', borderRadius: '12px', border: '1px solid var(--border)' }}>
                 <div>
                   <span style={{ fontWeight: '700' }}>{r.description}</span>
                   <span style={{ marginLeft: '1rem', fontSize: '0.7rem', color: 'var(--p-text-muted)', textTransform: 'uppercase', fontWeight: '800' }}>{r.category}</span>
@@ -131,12 +138,12 @@ const Settings = () => {
       {/* Gestión de Rutinas */}
       {activeTab === 'routines' && (
         <div className="grid">
-          {members.map(m => (
+          {members.map((m: Member) => (
             <div key={m.id} className="card">
               <h3 className="card-title">{m.avatar} Rutina de {m.name}</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
-                {routines.filter(r => r.member === m.name).map(r => (
-                  <div key={r.id} style={{ padding: '0.75rem', background: '#f8fafc', borderRadius: '8px', display: 'flex', justifyContent: 'space-between' }}>
+                {routines.filter((r: Routine) => r.member === m.name).map((r: Routine) => (
+                  <div key={r.id} style={{ padding: '0.75rem', background: 'var(--p-background)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between' }}>
                     <div>
                       <p style={{ fontWeight: '700', fontSize: '0.9rem' }}>{r.name}</p>
                       <p style={{ fontSize: '0.75rem', color: 'var(--p-text-muted)' }}>{r.time}</p>
@@ -160,21 +167,22 @@ const Settings = () => {
           </div>
 
           {showChoreForm && (
-            <form onSubmit={handleAddChore} style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '12px', marginBottom: '1.5rem', border: '1px solid #e2e8f0' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem' }}>
-                <input required placeholder="Nombre de la tarea..." value={choreName} onChange={e => setChoreName(e.target.value)} style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid #ddd' }} />
-                <select value={choreUser} onChange={e => setChoreUser(e.target.value)} style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid #ddd' }}>
-                  {members.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+            <form onSubmit={handleAddChore} style={{ background: 'var(--p-background)', padding: '1.5rem', borderRadius: '12px', marginBottom: '1.5rem', border: '1px solid var(--border)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', alignItems: 'end' }}>
+              <div><label style={{ fontSize: '0.75rem', fontWeight: '700' }}>Nombre</label><input required value={choreName} onChange={e => setChoreName(e.target.value)} style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--border)' }} /></div>
+              <div><label style={{ fontSize: '0.75rem', fontWeight: '700' }}>Asignar</label>
+                <select value={choreUser} onChange={e => setChoreUser(e.target.value)} style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                  <option value="Familia">Familia (Compartida)</option>
+                  {members.map((m: Member) => <option key={m.id} value={m.name}>{m.name}</option>)}
                 </select>
-                <input type="number" placeholder="Puntos" value={chorePoints} onChange={e => setChorePoints(Number(e.target.value))} style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid #ddd' }} />
-                <button type="submit" className="btn-primary">Añadir</button>
               </div>
+              <div><label style={{ fontSize: '0.75rem', fontWeight: '700' }}>Puntos</label><input type="number" value={chorePoints} onChange={e => setChorePoints(Number(e.target.value))} style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--border)' }} /></div>
+              <button type="submit" className="btn-primary" style={{ padding: '0.6rem' }}><Save size={18}/></button>
             </form>
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {chores.map(c => (
-              <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: '#f8fafc', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.05)' }}>
+            {chores.map((c: Chore) => (
+              <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: 'var(--p-background)', borderRadius: '12px', border: '1px solid var(--border)' }}>
                 <div>
                   <span style={{ fontWeight: '700' }}>{c.name}</span>
                   <span style={{ marginLeft: '1rem', fontSize: '0.75rem', color: 'white', background: 'var(--p-primary)', padding: '0.2rem 0.5rem', borderRadius: '4px' }}>{c.user}</span>

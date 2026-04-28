@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 
-// --- Interfaces V8.1 ---
+// --- Interfaces V8.2 ---
 
 export interface Ingredient {
   name: string;
@@ -18,6 +18,8 @@ export interface Food {
   ingredients: Ingredient[];
   maxPerWeek?: number;
   isFavorite?: boolean;
+  calories?: number;
+  prepTime?: number;
 }
 
 export interface WeeklyMenuItem {
@@ -72,6 +74,13 @@ export interface SchoolTask {
   completed: boolean;
 }
 
+export interface Rule {
+  id: string;
+  description: string;
+  points: number;
+  category: string;
+}
+
 export interface PointLog {
   id: string;
   member: string;
@@ -119,7 +128,9 @@ interface DataContextType {
   deleteRule: (id: string) => void;
   addPointLog: (log: Omit<PointLog, 'id' | 'date'>) => void;
   deletePointLog: (id: string) => void;
+  updateMember: (id: string, member: Partial<Member>) => void;
   addRoutine: (routine: Omit<Routine, 'id'>) => void;
+  updateRoutine: (id: string, routine: Partial<Routine>) => void;
   deleteRoutine: (id: string) => void;
   toggleRoutineTask: (routineId: string, taskIndex: number, memberName: string) => void;
   assignMeal: (day: string, meal: string, foodIds: string[], member: string) => void;
@@ -147,6 +158,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [chores, setChores] = useState<Chore[]>([]);
   const [schoolTasks, setSchoolTasks] = useState<SchoolTask[]>([]);
   const [pointLogs, setPointLogs] = useState<PointLog[]>([]);
+  const [rules, setRules] = useState<Rule[]>([
+    { id: '1', description: 'No comer la comida', points: -50, category: 'Comida' },
+    { id: '2', description: 'No sacar la basura', points: -20, category: 'Hogar' },
+    { id: '3', description: 'Ayudar a alguien', points: 30, category: 'Conducta' }
+  ]);
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [shoppingNotes, setShoppingNotes] = useState<ShoppingNote[]>([]);
@@ -167,6 +183,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         if (data.chores) setChores(data.chores);
         if (data.schoolTasks) setSchoolTasks(data.schoolTasks);
         if (data.pointLogs) setPointLogs(data.pointLogs);
+        if (data.rules) setRules(data.rules);
         if (data.routines) setRoutines(data.routines);
         if (data.products) setProducts(data.products);
         if (data.shoppingNotes) setShoppingNotes(data.shoppingNotes);
@@ -181,19 +198,19 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (!isCloudLoaded) return;
-    localStorage.setItem('fh_backup_v8', JSON.stringify({ members, foods, weeklyMenu, chores, schoolTasks, pointLogs, routines, products, shoppingNotes, routineLogs }));
+    localStorage.setItem('fh_backup_v8', JSON.stringify({ members, foods, weeklyMenu, chores, schoolTasks, pointLogs, rules, routines, products, shoppingNotes, routineLogs }));
     if (db) {
-      const payload = sanitize({ members, foods, weeklyMenu, chores, schoolTasks, pointLogs, routines, products, shoppingNotes, routineLogs });
+      const payload = sanitize({ members, foods, weeklyMenu, chores, schoolTasks, pointLogs, rules, routines, products, shoppingNotes, routineLogs });
       setDoc(doc(db, 'familyhub', 'main_state'), payload, { merge: true }).catch(console.error);
     }
-  }, [members, foods, weeklyMenu, chores, schoolTasks, pointLogs, routines, products, shoppingNotes, routineLogs, isCloudLoaded]);
+  }, [members, foods, weeklyMenu, chores, schoolTasks, pointLogs, rules, routines, products, shoppingNotes, routineLogs, isCloudLoaded]);
 
   const points = members.reduce((acc, m) => {
     acc[m.name] = pointLogs.filter(l => l.member === m.name).reduce((sum, l) => sum + l.points, 0);
     return acc;
   }, {} as { [key: string]: number });
 
-  // Métodos CRUD simplificados para enviar a Firestore
+  // Métodos CRUD
   const addFood = (f: Omit<Food, 'id'>) => setFoods([...foods, { ...f, id: Date.now().toString() }]);
   const updateFood = (id: string, f: Partial<Food>) => setFoods(foods.map(x => x.id === id ? { ...x, ...f } as Food : x));
   const deleteFood = (id: string) => setFoods(foods.filter(x => x.id !== id));
@@ -203,6 +220,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const deleteProduct = (id: string) => setProducts(products.filter(x => x.id !== id));
 
   const addChore = (c: Omit<Chore, 'id' | 'status'>) => setChores([...chores, { ...c, id: Date.now().toString(), status: 'Pendiente' }]);
+  const updateChore = (id: string, c: Partial<Chore>) => setChores(chores.map(x => x.id === id ? { ...x, ...c } as Chore : x));
   const deleteChore = (id: string) => setChores(chores.filter(x => x.id !== id));
   const toggleChore = (id: string) => {
     setChores(chores.map(c => {
@@ -217,14 +235,34 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }));
   };
 
+  const addRule = (r: Omit<Rule, 'id'>) => setRules([...rules, { ...r, id: Date.now().toString() }]);
+  const updateRule = (id: string, r: Partial<Rule>) => setRules(rules.map(x => x.id === id ? { ...x, ...r } as Rule : x));
+  const deleteRule = (id: string) => setRules(rules.filter(x => x.id !== id));
+
   const addPointLog = (l: Omit<PointLog, 'id' | 'date'>) => setPointLogs([...pointLogs, { ...l, id: Date.now().toString(), date: new Date().toISOString() }]);
   const deletePointLog = (id: string) => setPointLogs(pointLogs.filter(x => x.id !== id));
 
   const addRoutine = (r: Omit<Routine, 'id'>) => setRoutines([...routines, { ...r, id: Date.now().toString() }]);
+  const updateRoutine = (id: string, r: Partial<Routine>) => setRoutines(routines.map(x => x.id === id ? { ...x, ...r } as Routine : x));
   const deleteRoutine = (id: string) => setRoutines(routines.filter(x => x.id !== id));
-  const toggleRoutineTask = (rid: string, idx: number, m: string) => {
+  
+  const updateMember = (id: string, m: Partial<Member>) => setMembers(members.map(item => item.id === id ? { ...item, ...m } as Member : item));
+
+  const toggleRoutineTask = (rid: string, idx: number, mName: string) => {
     const key = `${new Date().toISOString().split('T')[0]}_${rid}_${idx}`;
-    setRoutineLogs(prev => prev.includes(key) ? prev.filter(x => x !== key) : [...prev, key]);
+    setRoutineLogs(prev => {
+      if (prev.includes(key)) return prev.filter(x => x !== key);
+      const next = [...prev, key];
+      const routine = routines.find(r => r.id === rid);
+      if (routine) {
+        const todayDate = new Date().toISOString().split('T')[0];
+        const routineTasksDone = next.filter(k => k.startsWith(`${todayDate}_${rid}_`)).length;
+        if (routineTasksDone === routine.tasks.length) {
+          addPointLog({ member: mName, description: `Rutina completada: ${routine.name}`, points: 30 });
+        }
+      }
+      return next;
+    });
   };
 
   const assignMeal = (d: string, m: string, ids: string[], mem: string) => {
@@ -242,10 +280,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <DataContext.Provider value={{ 
-      foods, chores, schoolTasks, weeklyMenu, pointLogs, members, routines, products, shoppingNotes, points, routineLogs,
-      addFood, updateFood, deleteFood, addProduct, updateProduct, deleteProduct, addChore, deleteChore, toggleChore,
-      addPointLog, deletePointLog, addRoutine, deleteRoutine, toggleRoutineTask, assignMeal, toggleAte,
-      addSchoolTask, updateSchoolTask, deleteSchoolTask, toggleSchoolTask, addShoppingNote: (t) => setShoppingNotes([...shoppingNotes, { id: Date.now().toString(), text: t, createdAt: new Date().toISOString() }]), deleteShoppingNote: (id) => setShoppingNotes(shoppingNotes.filter(x => x.id !== id))
+      foods, chores, schoolTasks, weeklyMenu, pointLogs, rules, members, routines, products, shoppingNotes, points, routineLogs,
+      addFood, updateFood, deleteFood, addProduct, updateProduct, deleteProduct, addChore, updateChore, deleteChore, toggleChore,
+      addRule, updateRule, deleteRule, addPointLog, deletePointLog, updateMember, addRoutine, updateRoutine, deleteRoutine, toggleRoutineTask,
+      assignMeal, toggleAte, updateSchoolTask, addSchoolTask, deleteSchoolTask, toggleSchoolTask,
+      addShoppingNote: (t) => setShoppingNotes([...shoppingNotes, { id: Date.now().toString(), text: t, createdAt: new Date().toISOString() }]), deleteShoppingNote: (id) => setShoppingNotes(shoppingNotes.filter(x => x.id !== id))
     }}>
       {children}
     </DataContext.Provider>
