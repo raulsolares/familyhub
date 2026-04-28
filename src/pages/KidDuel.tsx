@@ -4,11 +4,10 @@ import { Trophy, Star, ArrowLeft, CheckCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const KidDuel = () => {
-  const { routines, points, addPointLog } = useData();
+  const { routines, points, routineLogs, toggleRoutineTask } = useData();
   const [celebrating, setCelebration] = useState<string | null>(null);
   
-  // Estado local para llevar el progreso de las rutinas hoy
-  const [completedTasks, setCompletedTasks] = useState<string[]>([]);
+  const todayDate = new Date().toISOString().split('T')[0];
 
   const getKidRoutines = (name: string) => {
     return routines.filter(r => r.member === name);
@@ -18,31 +17,28 @@ const KidDuel = () => {
   const ariaRoutines = getKidRoutines('Aria');
 
   const handleTaskComplete = (routineId: string, taskIndex: number, kidName: string, totalTasks: number) => {
-    const taskKey = `${routineId}-${taskIndex}`;
-    if (completedTasks.includes(taskKey)) return;
+    const isTaskDone = routineLogs.includes(`${todayDate}_${routineId}_${taskIndex}`);
+    if (isTaskDone) return; // En el duelo, los niños solo pueden "hacer" tareas, no desmarcarlas para evitar trampas.
+    
+    toggleRoutineTask(routineId, taskIndex, kidName);
 
-    const newCompleted = [...completedTasks, taskKey];
-    setCompletedTasks(newCompleted);
-
-    // Sonido de check (Mock)
+    // Sonido de check
     const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3');
     audio.volume = 0.5;
     audio.play().catch(() => {});
 
-    // Verificar si se completó toda la rutina
-    const routineTasksCompleted = newCompleted.filter(k => k.startsWith(`${routineId}-`)).length;
-    if (routineTasksCompleted === totalTasks) {
-      addPointLog({ member: kidName, description: 'Rutina completada', points: 30 });
+    // Mostrar celebración si es la última tarea
+    const routineTasksDone = routineLogs.filter(k => k.startsWith(`${todayDate}_${routineId}_`)).length;
+    if (routineTasksDone + 1 === totalTasks) {
       setCelebration(kidName);
       setTimeout(() => setCelebration(null), 3000);
-      
       const winAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3');
       winAudio.play().catch(() => {});
     }
   };
 
   const isRoutineDone = (routineId: string, totalTasks: number) => {
-    return completedTasks.filter(k => k.startsWith(`${routineId}-`)).length === totalTasks;
+    return routineLogs.filter(k => k.startsWith(`${todayDate}_${routineId}_`)).length === totalTasks;
   };
 
   return (
@@ -75,11 +71,11 @@ const KidDuel = () => {
               return (
                 <div key={routine.id} style={{ background: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: '0 8px 0 #c7d2fe', opacity: done ? 0.6 : 1 }}>
                   <h3 style={{ fontWeight: '900', fontSize: '1.2rem', color: '#1e1b4b', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between' }}>
-                    {routine.name} <span style={{ color: '#4f46e5' }}>{routine.time}</span>
+                    <span>{routine.icon} {routine.name}</span> <span style={{ color: '#4f46e5' }}>{routine.time}</span>
                   </h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                     {routine.tasks.map((t, i) => {
-                      const isTaskDone = completedTasks.includes(`${routine.id}-${i}`);
+                      const isTaskDone = routineLogs.includes(`${todayDate}_${routine.id}_${i}`);
                       return (
                         <div key={i} onClick={() => handleTaskComplete(routine.id, i, 'Alan', routine.tasks.length)} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
                           <div style={{ width: '24px', height: '24px', borderRadius: '50%', border: isTaskDone ? 'none' : '2px solid #cbd5e1', background: isTaskDone ? '#10b981' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -112,11 +108,11 @@ const KidDuel = () => {
               return (
                 <div key={routine.id} style={{ background: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: '0 8px 0 #fecdd3', opacity: done ? 0.6 : 1 }}>
                   <h3 style={{ fontWeight: '900', fontSize: '1.2rem', color: '#881337', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between' }}>
-                    {routine.name} <span style={{ color: '#f43f5e' }}>{routine.time}</span>
+                    <span>{routine.icon} {routine.name}</span> <span style={{ color: '#f43f5e' }}>{routine.time}</span>
                   </h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                     {routine.tasks.map((t, i) => {
-                      const isTaskDone = completedTasks.includes(`${routine.id}-${i}`);
+                      const isTaskDone = routineLogs.includes(`${todayDate}_${routine.id}_${i}`);
                       return (
                         <div key={i} onClick={() => handleTaskComplete(routine.id, i, 'Aria', routine.tasks.length)} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
                           <div style={{ width: '24px', height: '24px', borderRadius: '50%', border: isTaskDone ? 'none' : '2px solid #cbd5e1', background: isTaskDone ? '#10b981' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

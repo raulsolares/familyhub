@@ -6,13 +6,16 @@ import type { SchoolTask } from '../context/DataContext';
 
 const SchoolHub = () => {
   const { role } = useUser();
-  const { schoolTasks, addSchoolTask, updateSchoolTask, deleteSchoolTask, toggleSchoolTask } = useData();
+  const { schoolTasks, addSchoolTask, updateSchoolTask, deleteSchoolTask, toggleSchoolTask, members } = useData();
+
+  const children = members.filter(m => m.role === 'child');
+  const defaultChild = children.length > 0 ? children[0].name : '';
 
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState<SchoolTask | null>(null);
 
   // Form states
-  const [child, setChild] = useState('Mateo');
+  const [child, setChild] = useState(defaultChild);
   const [title, setTitle] = useState('');
   const [desc, setDesc] = useState('');
   const [date, setDate] = useState('');
@@ -32,7 +35,7 @@ const SchoolHub = () => {
   };
 
   const resetForm = () => {
-    setChild('Mateo');
+    setChild(defaultChild);
     setTitle('');
     setDesc('');
     setDate('');
@@ -152,8 +155,8 @@ const SchoolHub = () => {
                         borderRadius: '999px', 
                         fontSize: '0.7rem', 
                         fontWeight: '700',
-                        background: item.child === 'Mateo' ? '#eef2ff' : '#fff1f2',
-                        color: item.child === 'Mateo' ? '#4f46e5' : '#f43f5e'
+                        background: item.child === 'Alan' ? '#eef2ff' : '#fff1f2',
+                        color: item.child === 'Alan' ? '#4f46e5' : '#f43f5e'
                       }}>
                         {item.child}
                       </span>

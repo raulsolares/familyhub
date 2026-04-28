@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
+import { doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { db } from '../firebase';
 
 // --- Interfaces Extendidas V8 ---
 
@@ -12,7 +14,7 @@ export interface Ingredient {
 export interface Food {
   id: string;
   name: string;
-  categories: string[]; // Ahora es un array (multicategoría)
+  categories: string[];
   ingredients: Ingredient[];
   maxPerWeek?: number;
   maxPerDay?: number;
@@ -27,7 +29,7 @@ export interface WeeklyMenuItem {
   id: string;
   day: string;
   meal: string;
-  foodIds: string[]; // Ahora puede tener varios alimentos
+  foodIds: string[];
   member: string;
   ate: boolean;
 }
@@ -50,11 +52,11 @@ export interface ShoppingNote {
 export interface Chore {
   id: string;
   name: string;
-  user: string; // 'Familia' o el nombre del integrante
+  user: string;
   freq: string;
   status: 'Hecho' | 'Pendiente';
   points: number;
-  icon?: string; // Para la interfaz de niños
+  icon?: string;
 }
 
 export interface Routine {
@@ -63,7 +65,7 @@ export interface Routine {
   name: string;
   time: string;
   tasks: string[];
-  icon?: string; // Para la interfaz de niños
+  icon?: string;
 }
 
 export interface SchoolTask {
@@ -72,14 +74,14 @@ export interface SchoolTask {
   title: string;
   desc: string;
   date: string;
-  type: string; // Ahora es abierto (configurable)
+  type: string;
   completed: boolean;
 }
 
 export interface Rule {
   id: string;
   description: string;
-  points: number; // Positivo para premio, negativo para consecuencia
+  points: number;
   category: 'Comida' | 'Hogar' | 'Escuela' | 'Conducta' | 'Otro';
 }
 
@@ -109,6 +111,7 @@ interface DataContextType {
   routines: Routine[];
   products: Product[];
   shoppingNotes: ShoppingNote[];
+  routineLogs: string[];
   points: { [key: string]: number };
   
   // Acciones
@@ -140,6 +143,7 @@ interface DataContextType {
   addRoutine: (routine: Omit<Routine, 'id'>) => void;
   updateRoutine: (id: string, routine: Partial<Routine>) => void;
   deleteRoutine: (id: string) => void;
+  toggleRoutineTask: (routineId: string, taskIndex: number, memberName: string) => void;
 
   assignMeal: (day: string, meal: string, foodIds: string[], member: string) => void;
   toggleAte: (id: string) => void;
@@ -213,8 +217,54 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     return saved ? JSON.parse(saved) : [];
   });
 
-  // Persistencia Centralizada
+  const [routineLogs, setRoutineLogs] = useState<string[]>(() => {
+    const saved = localStorage.getItem('fh_routines_logs_v8');
+    if (saved) {
+      const todayDate = new Date().toISOString().split('T')[0];
+      const parsed = JSON.parse(saved);
+      return parsed.filter((log: string) => log.startsWith(todayDate));
+    }
+    return [];
+  });
+
+  const [isCloudLoaded, setIsCloudLoaded] = useState(false);
+
+  // Sincronización Real-time (Firebase)
   useEffect(() => {
+    if (!db) {
+      setIsCloudLoaded(true); // Modo Local
+      return;
+    }
+
+    const unsub = onSnapshot(doc(db, 'familyhub', 'main_state'), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.members) setMembers(data.members);
+        if (data.rules) setRules(data.rules);
+        if (data.pointLogs) setPointLogs(data.pointLogs);
+        if (data.routines) setRoutines(data.routines);
+        if (data.foods) setFoods(data.foods);
+        if (data.weeklyMenu) setWeeklyMenu(data.weeklyMenu);
+        if (data.chores) setChores(data.chores);
+        if (data.schoolTasks) setSchoolTasks(data.schoolTasks);
+        if (data.products) setProducts(data.products);
+        if (data.shoppingNotes) setShoppingNotes(data.shoppingNotes);
+        if (data.routineLogs) {
+           const todayDate = new Date().toISOString().split('T')[0];
+           setRoutineLogs(data.routineLogs.filter((log: string) => log.startsWith(todayDate)));
+        }
+      }
+      setIsCloudLoaded(true);
+    });
+
+    return () => unsub();
+  }, []);
+
+  // Persistencia Centralizada (Local & Cloud)
+  useEffect(() => {
+    if (!isCloudLoaded) return; // Evita sobreescribir la nube con estados vacíos iniciales
+
+    // Local
     localStorage.setItem('fh_members_v8', JSON.stringify(members));
     localStorage.setItem('fh_rules_v8', JSON.stringify(rules));
     localStorage.setItem('fh_pointlogs_v8', JSON.stringify(pointLogs));
@@ -225,7 +275,14 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem('fh_school_v8', JSON.stringify(schoolTasks));
     localStorage.setItem('fh_products_v8', JSON.stringify(products));
     localStorage.setItem('fh_shoppingNotes_v8', JSON.stringify(shoppingNotes));
-  }, [members, rules, pointLogs, routines, foods, weeklyMenu, chores, schoolTasks, products, shoppingNotes]);
+    localStorage.setItem('fh_routines_logs_v8', JSON.stringify(routineLogs));
+
+    // Nube
+    if (db) {
+      const payload = { members, rules, pointLogs, routines, foods, weeklyMenu, chores, schoolTasks, products, shoppingNotes, routineLogs };
+      setDoc(doc(db, 'familyhub', 'main_state'), payload, { merge: true }).catch(console.error);
+    }
+  }, [members, rules, pointLogs, routines, foods, weeklyMenu, chores, schoolTasks, products, shoppingNotes, routineLogs, isCloudLoaded]);
 
   // Cálculos dinámicos de puntos
   const points = members.reduce((acc, m) => {
@@ -277,6 +334,27 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const updateRoutine = (id: string, r: Partial<Routine>) => setRoutines(routines.map(item => item.id === id ? { ...item, ...r } as Routine : item));
   const deleteRoutine = (id: string) => setRoutines(routines.filter(r => r.id !== id));
 
+  const toggleRoutineTask = (routineId: string, taskIndex: number, memberName: string) => {
+    const todayDate = new Date().toISOString().split('T')[0];
+    const logKey = `${todayDate}_${routineId}_${taskIndex}`;
+    
+    setRoutineLogs(prev => {
+      if (prev.includes(logKey)) {
+        return prev.filter(k => k !== logKey);
+      } else {
+        const next = [...prev, logKey];
+        const routine = routines.find(r => r.id === routineId);
+        if (routine) {
+           const routineTasksDone = next.filter(k => k.startsWith(`${todayDate}_${routineId}_`)).length;
+           if (routineTasksDone === routine.tasks.length) {
+              addPointLog({ member: memberName, description: `Rutina completada: ${routine.name}`, points: 30 });
+           }
+        }
+        return next;
+      }
+    });
+  };
+
   const assignMeal = (day: string, meal: string, foodIds: string[], member: string) => {
     setWeeklyMenu(prev => {
       const filtered = prev.filter(item => !(item.day === day && item.meal === meal && item.member === member));
@@ -303,9 +381,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <DataContext.Provider value={{ 
-      foods, chores, schoolTasks, weeklyMenu, rules, pointLogs, members, routines, products, shoppingNotes, points,
+      foods, chores, schoolTasks, weeklyMenu, rules, pointLogs, members, routines, products, shoppingNotes, points, routineLogs,
       addFood, updateFood, deleteFood, addChore, updateChore, deleteChore, toggleChore,
-      addRule, updateRule, deleteRule, addPointLog, deletePointLog, updateMember, addRoutine, updateRoutine, deleteRoutine,
+      addRule, updateRule, deleteRule, addPointLog, deletePointLog, updateMember, addRoutine, updateRoutine, deleteRoutine, toggleRoutineTask,
       assignMeal, toggleAte, updateSchoolTask, addSchoolTask, deleteSchoolTask, toggleSchoolTask,
       addProduct, updateProduct, deleteProduct, addShoppingNote, deleteShoppingNote
     }}>
