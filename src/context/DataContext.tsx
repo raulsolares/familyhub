@@ -260,6 +260,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     return () => unsub();
   }, []);
 
+  // Función para limpiar datos inválidos para Firebase (elimina undefined)
+  const sanitize = (obj: any): any => {
+    return JSON.parse(JSON.stringify(obj, (_, value) => (value === undefined ? null : value)));
+  };
+
   // Persistencia Centralizada (Local & Cloud)
   useEffect(() => {
     if (!isCloudLoaded) return; // Evita sobreescribir la nube con estados vacíos iniciales
@@ -279,7 +284,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
     // Nube
     if (db) {
-      const payload = { members, rules, pointLogs, routines, foods, weeklyMenu, chores, schoolTasks, products, shoppingNotes, routineLogs };
+      const payload = sanitize({ members, rules, pointLogs, routines, foods, weeklyMenu, chores, schoolTasks, products, shoppingNotes, routineLogs });
       setDoc(doc(db, 'familyhub', 'main_state'), payload, { merge: true }).catch(console.error);
     }
   }, [members, rules, pointLogs, routines, foods, weeklyMenu, chores, schoolTasks, products, shoppingNotes, routineLogs, isCloudLoaded]);
