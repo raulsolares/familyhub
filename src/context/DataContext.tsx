@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 
-// --- Interfaces V8.2 ---
+// --- Interfaces V9 (Final) ---
 
 export interface Ingredient {
   name: string;
@@ -53,6 +53,7 @@ export interface Chore {
   freq: string;
   status: 'Hecho' | 'Pendiente';
   points: number;
+  routineId?: string; // Vínculo opcional a rutina
 }
 
 export interface Routine {
@@ -61,7 +62,7 @@ export interface Routine {
   name: string;
   time: string;
   tasks: string[];
-  icon?: string;
+  icon: string;
 }
 
 export interface SchoolTask {
@@ -146,7 +147,7 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [isCloudLoaded, setIsCloudLoaded] = useState(false);
 
-  // Estados
+  // Estados iniciales corregidos
   const [members, setMembers] = useState<Member[]>([
     { id: '1', name: 'Raúl', role: 'parent', avatar: '👨' },
     { id: '2', name: 'Tania', role: 'parent', avatar: '👩' },
@@ -168,12 +169,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [shoppingNotes, setShoppingNotes] = useState<ShoppingNote[]>([]);
   const [routineLogs, setRoutineLogs] = useState<string[]>([]);
 
-  // Sincronización Real-time (Firebase)
   useEffect(() => {
-    if (!db) {
-      setIsCloudLoaded(true);
-      return;
-    }
+    if (!db) { setIsCloudLoaded(true); return; }
     const unsub = onSnapshot(doc(db, 'familyhub', 'main_state'), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
@@ -198,7 +195,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (!isCloudLoaded) return;
-    localStorage.setItem('fh_backup_v8', JSON.stringify({ members, foods, weeklyMenu, chores, schoolTasks, pointLogs, rules, routines, products, shoppingNotes, routineLogs }));
     if (db) {
       const payload = sanitize({ members, foods, weeklyMenu, chores, schoolTasks, pointLogs, rules, routines, products, shoppingNotes, routineLogs });
       setDoc(doc(db, 'familyhub', 'main_state'), payload, { merge: true }).catch(console.error);
@@ -210,7 +206,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     return acc;
   }, {} as { [key: string]: number });
 
-  // Métodos CRUD
+  // CRUD Implementations
   const addFood = (f: Omit<Food, 'id'>) => setFoods([...foods, { ...f, id: Date.now().toString() }]);
   const updateFood = (id: string, f: Partial<Food>) => setFoods(foods.map(x => x.id === id ? { ...x, ...f } as Food : x));
   const deleteFood = (id: string) => setFoods(foods.filter(x => x.id !== id));
@@ -246,24 +242,24 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const updateRoutine = (id: string, r: Partial<Routine>) => setRoutines(routines.map(x => x.id === id ? { ...x, ...r } as Routine : x));
   const deleteRoutine = (id: string) => setRoutines(routines.filter(x => x.id !== id));
   
-  const updateMember = (id: string, m: Partial<Member>) => setMembers(members.map(item => item.id === id ? { ...item, ...m } as Member : item));
-
   const toggleRoutineTask = (rid: string, idx: number, mName: string) => {
-    const key = `${new Date().toISOString().split('T')[0]}_${rid}_${idx}`;
+    const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+    const key = `${todayStr}_${rid}_${idx}`;
     setRoutineLogs(prev => {
       if (prev.includes(key)) return prev.filter(x => x !== key);
       const next = [...prev, key];
       const routine = routines.find(r => r.id === rid);
       if (routine) {
-        const todayDate = new Date().toISOString().split('T')[0];
-        const routineTasksDone = next.filter(k => k.startsWith(`${todayDate}_${rid}_`)).length;
+        const routineTasksDone = next.filter(k => k.startsWith(`${todayStr}_${rid}_`)).length;
         if (routineTasksDone === routine.tasks.length) {
-          addPointLog({ member: mName, description: `Rutina completada: ${routine.name}`, points: 30 });
+          addPointLog({ member: mName, description: `Rutina: ${routine.name}`, points: 30 });
         }
       }
       return next;
     });
   };
+
+  const updateMember = (id: string, m: Partial<Member>) => setMembers(members.map(item => item.id === id ? { ...item, ...m } as Member : item));
 
   const assignMeal = (d: string, m: string, ids: string[], mem: string) => {
     setWeeklyMenu(prev => {
