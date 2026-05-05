@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useData } from '../context/DataContext';
-import { X, CheckCircle2, User, Plus } from 'lucide-react';
+import { X, CheckCircle2, User, Plus, Minus } from 'lucide-react';
 
 const WeeklyMenu = () => {
   const { weeklyMenu, foods, assignMeal, toggleAte } = useData();
@@ -16,6 +16,7 @@ const WeeklyMenu = () => {
   // Estado para el modal de asignación múltiple
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [selectedFoodIds, setSelectedFoodIds] = useState<string[]>([]);
+  const [foodQtys, setFoodQtys] = useState<Record<string, number>>({});
 
   const handleSlotClick = (day: string, meal: string, member: string) => {
     setSelectedSlot({ day, meal, member });
@@ -24,15 +25,15 @@ const WeeklyMenu = () => {
     // Cargar los platillos actuales de esa celda si existen
     const existing = weeklyMenu.find(w => w.day === day && w.meal === meal && w.member === member);
     setSelectedFoodIds(existing ? existing.foodIds : []);
-    
+    setFoodQtys(existing?.quantities || {});
+
     setShowModal(true);
   };
 
   const handleAssign = () => {
     if (selectedSlot) {
-      // Asignar a todos los miembros seleccionados
       selectedMembers.forEach(m => {
-        assignMeal(selectedSlot.day, selectedSlot.meal, selectedFoodIds, m);
+        assignMeal(selectedSlot.day, selectedSlot.meal, selectedFoodIds, m, foodQtys);
       });
     }
     setShowModal(false);
@@ -50,9 +51,18 @@ const WeeklyMenu = () => {
   const toggleModalFood = (id: string) => {
     if (selectedFoodIds.includes(id)) {
       setSelectedFoodIds(selectedFoodIds.filter(x => x !== id));
+      setFoodQtys(prev => { const n = { ...prev }; delete n[id]; return n; });
     } else {
       setSelectedFoodIds([...selectedFoodIds, id]);
+      setFoodQtys(prev => ({ ...prev, [id]: prev[id] || 1 }));
     }
+  };
+
+  const setQty = (id: string, delta: number) => {
+    setFoodQtys(prev => {
+      const next = Math.max(1, (prev[id] || 1) + delta);
+      return { ...prev, [id]: next };
+    });
   };
 
   const getMenuForSlot = (day: string, meal: string, member: string) => {
@@ -147,26 +157,52 @@ const WeeklyMenu = () => {
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', paddingRight: '0.5rem' }}>
-              <p style={{ fontWeight: '700', fontSize: '0.85rem' }}>Selecciona uno o más platillos:</p>
-              {foods.map(food => (
-                <button 
-                  key={food.id} 
-                  onClick={() => toggleModalFood(food.id)}
-                  style={{ 
-                    padding: '0.75rem', 
-                    background: selectedFoodIds.includes(food.id) ? '#eef2ff' : 'var(--p-background)', 
-                    border: selectedFoodIds.includes(food.id) ? '2px solid var(--p-primary)' : '1px solid var(--border)', 
-                    borderRadius: '8px', cursor: 'pointer', textAlign: 'left', fontWeight: '600', color: 'var(--p-text)',
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-                  }}
-                >
-                  <div>
-                    <span style={{ fontSize: '0.65rem', background: 'var(--p-primary)', color: 'white', padding: '0.2rem 0.4rem', borderRadius: '4px', marginRight: '0.5rem' }}>{food.categories[0]}</span>
-                    {food.name}
+              <p style={{ fontWeight: '700', fontSize: '0.85rem' }}>Selecciona platillos y porciones:</p>
+              {foods.map(food => {
+                const selected = selectedFoodIds.includes(food.id);
+                const qty = foodQtys[food.id] || 1;
+                return (
+                  <div
+                    key={food.id}
+                    style={{
+                      padding: '0.625rem 0.75rem',
+                      background: selected ? '#eef2ff' : 'var(--p-background)',
+                      border: selected ? '2px solid var(--p-primary)' : '1px solid var(--border)',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                    }}
+                  >
+                    <button
+                      onClick={() => toggleModalFood(food.id)}
+                      style={{ flex: 1, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontSize: '0.65rem', background: 'var(--p-primary)', color: 'white', padding: '0.15rem 0.4rem', borderRadius: '4px', flexShrink: 0 }}>{food.categories[0]}</span>
+                        <span style={{ fontWeight: '600', fontSize: '0.875rem', color: 'var(--p-text)' }}>{food.name}</span>
+                        {food.calories && <span style={{ fontSize: '0.7rem', color: 'var(--p-text-muted)' }}>{food.calories} kcal</span>}
+                      </div>
+                    </button>
+                    {selected ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}>
+                        <button onClick={() => setQty(food.id, -1)} style={{ width: '26px', height: '26px', borderRadius: '6px', border: '1px solid var(--border)', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Minus size={13} />
+                        </button>
+                        <span style={{ fontWeight: '800', fontSize: '0.875rem', color: 'var(--p-primary)', width: '24px', textAlign: 'center' }}>{qty}</span>
+                        <button onClick={() => setQty(food.id, 1)} style={{ width: '26px', height: '26px', borderRadius: '6px', border: '1px solid var(--border)', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Plus size={13} />
+                        </button>
+                      </div>
+                    ) : (
+                      <button onClick={() => toggleModalFood(food.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--p-text-muted)' }}>
+                        <Plus size={16} />
+                      </button>
+                    )}
                   </div>
-                  {selectedFoodIds.includes(food.id) && <CheckCircle2 size={16} color="var(--p-primary)" />}
-                </button>
-              ))}
+                );
+              })}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1rem' }}>

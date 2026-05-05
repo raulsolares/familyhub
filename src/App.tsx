@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import WeeklyMenu from './pages/WeeklyMenu';
@@ -12,9 +13,11 @@ import FoodManager from './pages/FoodManager';
 import KidZone from './pages/KidZone';
 import KidDuel from './pages/KidDuel';
 import PrepView from './pages/PrepView';
+import Calendar from './pages/Calendar';
 import Login from './pages/Login';
 import { useUser } from './context/UserContext';
 import { useData } from './context/DataContext';
+import { useNotifications } from './hooks/useNotifications';
 import {
   Bell, ChefHat, CheckSquare, TrendingUp, GraduationCap,
   AlertTriangle, CheckCircle2, Clock, ArrowRight,
@@ -24,6 +27,7 @@ import './styles/App.css';
 const Dashboard = () => {
   const { viewMode } = useUser();
   const { schoolTasks, points, weeklyMenu, foods, chores, members, prizeRequests } = useData();
+  const { requestPermission } = useNotifications(schoolTasks);
 
   if (viewMode === 'child') return <KidZone />;
 
@@ -77,6 +81,15 @@ const Dashboard = () => {
             <Link to="/rewards" className="badge badge-yellow" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
               <Bell size={12} /> {pendingPrizes.length} canje{pendingPrizes.length > 1 ? 's' : ''} pendiente{pendingPrizes.length > 1 ? 's' : ''}
             </Link>
+          )}
+          {'Notification' in window && Notification.permission === 'default' && (
+            <button
+              onClick={requestPermission}
+              className="badge badge-blue"
+              style={{ background: 'none', border: '1px solid var(--p-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.375rem', color: 'var(--p-primary)' }}
+            >
+              <Bell size={12} /> Activar alertas
+            </button>
           )}
           <span className="badge badge-blue">Hogar Sincronizado</span>
         </div>
@@ -287,24 +300,15 @@ const Dashboard = () => {
   );
 };
 
-const CalendarPage = () => (
-  <div>
-    <header className="page-header">
-      <h1 className="page-title">Calendario Familiar</h1>
-      <p className="page-subtitle">Eventos y fechas importantes</p>
-    </header>
-    <div className="card">
-      <div className="empty-state">
-        <p style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>📅</p>
-        <h3 style={{ fontWeight: '700', marginBottom: '0.5rem' }}>Próximamente</h3>
-        <p>Calendario mensual con eventos escolares, rutinas y recordatorios</p>
-      </div>
-    </div>
-  </div>
-);
 
 const App = () => {
   const { isLoggedIn } = useUser();
+
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+  }, []);
 
   return (
     <BrowserRouter>
@@ -323,7 +327,7 @@ const App = () => {
           <Route path="prep" element={<PrepView />} />
           <Route path="duel" element={<KidDuel />} />
           <Route path="settings" element={<Settings />} />
-          <Route path="calendar" element={<CalendarPage />} />
+          <Route path="calendar" element={<Calendar />} />
         </Route>
       </Routes>
     </BrowserRouter>
