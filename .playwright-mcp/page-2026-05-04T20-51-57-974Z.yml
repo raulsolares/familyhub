@@ -1,0 +1,19 @@
+- generic [ref=e5]:
+  - generic [ref=e6]:
+    - img [ref=e7]
+    - generic [ref=e10]: FamilyHub
+  - heading "¡Bienvenida Familia!" [level=2] [ref=e11]
+  - paragraph [ref=e12]: Inicia sesión para administrar tu hogar
+  - generic [ref=e13]:
+    - generic [ref=e14]:
+      - generic [ref=e15]: Usuario
+      - generic [ref=e16]:
+        - img [ref=e17]
+        - textbox "papa, mama, mateo o sofia" [ref=e20]
+    - generic [ref=e21]:
+      - generic [ref=e22]: Contraseña
+      - generic [ref=e23]:
+        - img [ref=e24]
+        - textbox "Contraseña" [ref=e27]
+    - button "Entrar al Hogar" [ref=e28] [cursor=pointer]
+  - paragraph [ref=e29]: "Tip: Prueba con 'papa' y '1234'"

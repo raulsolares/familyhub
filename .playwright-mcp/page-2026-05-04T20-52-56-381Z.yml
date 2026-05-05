@@ -1,0 +1,124 @@
+- generic [ref=e4]:
+  - complementary [ref=e5]:
+    - generic [ref=e6]:
+      - img [ref=e7]
+      - generic [ref=e10]: FamilyHub
+    - navigation [ref=e11]:
+      - link "Dashboard" [ref=e12] [cursor=pointer]:
+        - /url: /
+        - img [ref=e13]
+        - generic [ref=e18]: Dashboard
+      - link "Menú Semanal" [ref=e19] [cursor=pointer]:
+        - /url: /menu
+        - img [ref=e20]
+        - generic [ref=e23]: Menú Semanal
+      - link "Lista de Súper" [ref=e24] [cursor=pointer]:
+        - /url: /shopping
+        - img [ref=e25]
+        - generic [ref=e29]: Lista de Súper
+      - link "Módulo Escolar" [ref=e30] [cursor=pointer]:
+        - /url: /school
+        - img [ref=e31]
+        - generic [ref=e34]: Módulo Escolar
+      - link "Tareas del Hogar" [ref=e35] [cursor=pointer]:
+        - /url: /chores
+        - img [ref=e36]
+        - generic [ref=e39]: Tareas del Hogar
+      - link "Premios y Castigos" [ref=e40] [cursor=pointer]:
+        - /url: /rewards
+        - img [ref=e41]
+        - generic [ref=e47]: Premios y Castigos
+      - link "Calendario" [ref=e48] [cursor=pointer]:
+        - /url: /calendar
+        - img [ref=e49]
+        - generic [ref=e51]: Calendario
+      - link "Configuración" [ref=e52] [cursor=pointer]:
+        - /url: /settings
+        - img [ref=e53]
+        - generic [ref=e56]: Configuración
+    - generic [ref=e57]:
+      - generic [ref=e58]:
+        - generic [ref=e59]: 👨
+        - generic [ref=e60]:
+          - paragraph [ref=e61]: Raúl
+          - paragraph [ref=e62]: Modo Padres
+      - button "Cambiar a Modo Niños" [ref=e63] [cursor=pointer]
+      - button "Salir del Hogar" [ref=e64] [cursor=pointer]:
+        - img [ref=e65]
+        - text: Salir del Hogar
+  - main [ref=e68]:
+    - generic [ref=e69]:
+      - generic [ref=e70]:
+        - generic [ref=e71]:
+          - heading "Puntos y Logros" [level=1] [ref=e72]
+          - paragraph [ref=e73]: Seguimiento de comportamiento y metas familiares
+        - button "Aplicar Reto/Premio" [ref=e74] [cursor=pointer]:
+          - img [ref=e75]
+          - text: Aplicar Reto/Premio
+      - generic [ref=e77]:
+        - generic [ref=e78]:
+          - heading "Tabla de Clasificación" [level=3] [ref=e79]:
+            - img [ref=e80]
+            - text: Tabla de Clasificación
+          - generic [ref=e86]:
+            - generic [ref=e87]:
+              - generic [ref=e88]:
+                - generic [ref=e89]: "1"
+                - generic [ref=e90]: 👨
+                - generic [ref=e91]: Raúl
+              - generic [ref=e92]:
+                - generic [ref=e93]: 0 pts
+                - img [ref=e94]
+            - generic [ref=e97]:
+              - generic [ref=e98]:
+                - generic [ref=e99]: "2"
+                - generic [ref=e100]: 👩
+                - generic [ref=e101]: Tania
+              - generic [ref=e102]:
+                - generic [ref=e103]: 0 pts
+                - img [ref=e104]
+            - generic [ref=e107]:
+              - generic [ref=e108]:
+                - generic [ref=e109]: "3"
+                - generic [ref=e110]: 👦
+                - generic [ref=e111]: Alan
+              - generic [ref=e112]:
+                - generic [ref=e113]: 0 pts
+                - img [ref=e114]
+            - generic [ref=e117]:
+              - generic [ref=e118]:
+                - generic [ref=e119]: "4"
+                - generic [ref=e120]: 👧
+                - generic [ref=e121]: Aria
+              - generic [ref=e122]:
+                - generic [ref=e123]: 0 pts
+                - img [ref=e124]
+        - generic [ref=e127]:
+          - heading "Reglas Activas" [level=3] [ref=e128]:
+            - img [ref=e129]
+            - text: Reglas Activas
+          - generic [ref=e132]:
+            - generic [ref=e133]:
+              - generic [ref=e134]: No comer la comida
+              - generic [ref=e135]: "-50"
+            - generic [ref=e136]:
+              - generic [ref=e137]: No sacar la basura
+              - generic [ref=e138]: "-20"
+            - generic [ref=e139]:
+              - generic [ref=e140]: Ayudar a alguien
+              - generic [ref=e141]: "+30"
+      - generic [ref=e142]:
+        - heading "Historial de Auditoría (Modo Raúl/Tania)" [level=3] [ref=e143]:
+          - img [ref=e144]
+          - text: Historial de Auditoría (Modo Raúl/Tania)
+        - table [ref=e149]:
+          - rowgroup [ref=e150]:
+            - row "Fecha Miembro Descripción Puntos" [ref=e151]:
+              - columnheader "Fecha" [ref=e152]
+              - columnheader "Miembro" [ref=e153]
+              - columnheader "Descripción" [ref=e154]
+              - columnheader "Puntos" [ref=e155]
+              - columnheader [ref=e156]
+          - rowgroup [ref=e157]:
+            - row "No hay registros de puntos aún." [ref=e158]:
+              - cell "No hay registros de puntos aún." [ref=e159]

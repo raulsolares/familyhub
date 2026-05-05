@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000)",
+      "mcp__plugin_playwright_playwright__browser_navigate",
+      "mcp__plugin_playwright_playwright__browser_take_screenshot",
+      "mcp__plugin_playwright_playwright__browser_fill_form",
+      "mcp__plugin_playwright_playwright__browser_click",
+      "Read(//c/Users/rauls/.agents/skills/ui-ux-pro-max/**)",
+      "Bash(python scripts/search.py \"family productivity dashboard parent premium quality modern\" --design-system -p \"FamilyHub Parents\" -f markdown)",
+      "Bash(python \"C:/Users/rauls/.claude/skills/ui-ux-pro-max/scripts/search.py\" \"family productivity dashboard parent premium quality modern\" --design-system -p \"FamilyHub Parents\" -f markdown)",
+      "Bash(dir /s /b \"C:\\\\Users\\\\rauls\\\\.claude\\\\skills\\\\ui-ux-pro-max\\\\*.py\")",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\rauls\\\\.claude\\\\skills\\\\ui-ux-pro-max\" -Force | ForEach-Object { $_.FullName })",
+      "Bash(npx tsc *)"
+    ]
+  }
+}

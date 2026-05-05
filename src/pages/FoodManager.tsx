@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Search, Edit2, Trash2, UtensilsCrossed, X, Minus, Star, Clock, AlertCircle } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useData } from '../context/DataContext';
@@ -6,7 +6,9 @@ import type { Food, Ingredient } from '../context/DataContext';
 
 const FoodManager = () => {
   const { role } = useUser();
-  const { foods, addFood, deleteFood, updateFood } = useData();
+  const { foods, addFood, deleteFood, updateFood, ingredientItems, addIngredientItem } = useData();
+  const [activeIngSuggest, setActiveIngSuggest] = useState<number | null>(null);
+  const suggestRef = useRef<HTMLDivElement>(null);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -26,22 +28,27 @@ const FoodManager = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const validIngredients = ingredients.filter(i => i.name.trim() !== '');
-    const foodData = { 
-      name, 
-      categories, 
+    // Auto-add new ingredient names to the global DB
+    validIngredients.forEach(ing => {
+      const normalized = ing.name.trim().toLowerCase();
+      if (!ingredientItems.some(item => item.name.toLowerCase() === normalized)) {
+        addIngredientItem({ name: ing.name.trim(), unit: ing.unit, category: '' });
+      }
+    });
+    const foodData = {
+      name,
+      categories,
       ingredients: validIngredients,
       isFavorite,
       maxPerWeek: maxPerWeek ? Number(maxPerWeek) : undefined,
       calories: calories ? Number(calories) : undefined,
       prepTime: prepTime ? Number(prepTime) : undefined,
     };
-
     if (editingFood) {
       updateFood(editingFood.id, foodData);
     } else {
       addFood(foodData);
     }
-    
     resetForm();
   };
 
@@ -168,21 +175,52 @@ const FoodManager = () => {
                   <button type="button" onClick={addIngredientRow} style={{ padding: '0.2rem 0.5rem', background: 'var(--p-background)', color: 'var(--p-primary)', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}>+ Añadir</button>
                 </label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {ingredients.map((ing, i) => (
-                    <div key={i} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                      <input placeholder="Nombre" value={ing.name} onChange={(e) => updateIngredient(i, 'name', e.target.value)} style={{ flex: 2, padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border)' }} />
-                      <input type="number" placeholder="Cant." value={ing.amount} onChange={(e) => updateIngredient(i, 'amount', Number(e.target.value))} style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border)' }} />
-                      <select value={ing.unit} onChange={(e) => updateIngredient(i, 'unit', e.target.value)} style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border)' }}>
-                        <option value="pzas">pzas</option>
-                        <option value="ml">ml</option>
-                        <option value="gr">gr</option>
-                        <option value="kg">kg</option>
-                        <option value="lt">lt</option>
-                        <option value="paq">paq</option>
-                      </select>
-                      <button type="button" onClick={() => removeIngredientRow(i)} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }}><Minus size={16}/></button>
-                    </div>
-                  ))}
+                  {ingredients.map((ing, i) => {
+                    const query = ing.name.trim().toLowerCase();
+                    const suggestions = query.length >= 1
+                      ? ingredientItems.filter(item => item.name.toLowerCase().includes(query) && item.name.toLowerCase() !== query).slice(0, 6)
+                      : [];
+                    return (
+                      <div key={i} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                        <div style={{ flex: 2, position: 'relative' }}>
+                          <input
+                            placeholder="Nombre ingrediente"
+                            value={ing.name}
+                            onChange={e => { updateIngredient(i, 'name', e.target.value); setActiveIngSuggest(i); }}
+                            onFocus={() => setActiveIngSuggest(i)}
+                            onBlur={() => setTimeout(() => setActiveIngSuggest(null), 150)}
+                            style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border)', boxSizing: 'border-box' }}
+                          />
+                          {activeIngSuggest === i && suggestions.length > 0 && (
+                            <div ref={suggestRef} style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'white', border: '1px solid var(--border)', borderRadius: '8px', boxShadow: 'var(--shadow-md)', zIndex: 500, maxHeight: '160px', overflowY: 'auto' }}>
+                              {suggestions.map(s => (
+                                <button
+                                  key={s.id}
+                                  type="button"
+                                  onMouseDown={() => { updateIngredient(i, 'name', s.name); setActiveIngSuggest(null); }}
+                                  style={{ width: '100%', textAlign: 'left', padding: '0.5rem 0.75rem', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600', color: 'var(--p-text)' }}
+                                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--p-background)')}
+                                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                                >
+                                  {s.name}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <input type="number" placeholder="Cant." value={ing.amount} onChange={(e) => updateIngredient(i, 'amount', Number(e.target.value))} style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border)' }} />
+                        <select value={ing.unit} onChange={(e) => updateIngredient(i, 'unit', e.target.value)} style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                          <option value="pzas">pzas</option>
+                          <option value="ml">ml</option>
+                          <option value="gr">gr</option>
+                          <option value="kg">kg</option>
+                          <option value="lt">lt</option>
+                          <option value="paq">paq</option>
+                        </select>
+                        <button type="button" onClick={() => removeIngredientRow(i)} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', paddingTop: '0.5rem' }}><Minus size={16}/></button>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 

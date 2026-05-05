@@ -1,0 +1,47 @@
+- generic [ref=e4]:
+  - main [ref=e5]:
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - generic [ref=e8]: 👨
+        - heading "¡Hola, Raúl!" [level=1] [ref=e9]
+        - generic [ref=e11]:
+          - img [ref=e12]
+          - generic [ref=e14]: 0 pts
+      - generic [ref=e15]:
+        - generic [ref=e16] [cursor=pointer]:
+          - img [ref=e18]
+          - heading "Armar Menú" [level=3] [ref=e21]
+        - link "Duelo Familiar" [ref=e22] [cursor=pointer]:
+          - /url: /duel
+          - generic [ref=e23]:
+            - img [ref=e25]
+            - heading "Duelo Familiar" [level=3] [ref=e34]
+        - generic [ref=e35] [cursor=pointer]:
+          - img [ref=e37]
+          - heading "Reto Relámpago" [level=3] [ref=e40]
+        - link "Tienda Premios" [ref=e41] [cursor=pointer]:
+          - /url: /rewards
+          - generic [ref=e42]:
+            - img [ref=e44]
+            - heading "Tienda Premios" [level=3] [ref=e50]
+      - heading "🍴 Mi Comida de Hoy" [level=3] [ref=e52]
+  - navigation [ref=e53]:
+    - link "Inicio" [ref=e54] [cursor=pointer]:
+      - /url: /
+      - img [ref=e55]
+      - generic [ref=e58]: Inicio
+    - link "Tareas" [ref=e59] [cursor=pointer]:
+      - /url: /chores
+      - img [ref=e60]
+      - generic [ref=e63]: Tareas
+    - link "Escuela" [ref=e64] [cursor=pointer]:
+      - /url: /school
+      - img [ref=e65]
+      - generic [ref=e68]: Escuela
+    - link "Premios" [ref=e69] [cursor=pointer]:
+      - /url: /rewards
+      - img [ref=e70]
+      - generic [ref=e76]: Premios
+    - button "Salir" [ref=e77] [cursor=pointer]:
+      - img [ref=e78]
+      - generic [ref=e81]: Salir

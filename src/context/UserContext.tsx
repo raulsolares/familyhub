@@ -15,81 +15,93 @@ interface User {
 
 interface UserContextType {
   role: Role;
-  setRole: (role: Role) => void;
+  viewMode: Role;          // lo que se muestra (padres pueden cambiar a 'child')
+  isKidView: boolean;      // true cuando padre está en vista niño
   user: User | null;
   login: (username: string, password: string) => boolean;
   logout: () => void;
   isLoggedIn: boolean;
   updateTheme: (theme: Theme) => void;
+  enterKidView: () => void;
+  exitKidView: () => void;
 }
+
+const USERS: Record<string, { name: string; avatar: string; role: Role; theme: Theme }> = {
+  papa:  { name: 'Raúl',  avatar: '👨', role: 'parent', theme: 'light' },
+  raul:  { name: 'Raúl',  avatar: '👨', role: 'parent', theme: 'light' },
+  mama:  { name: 'Tania', avatar: '👩', role: 'parent', theme: 'light' },
+  tania: { name: 'Tania', avatar: '👩', role: 'parent', theme: 'light' },
+  alan:  { name: 'Alan',  avatar: '👦', role: 'child',  theme: 'fun'   },
+  aria:  { name: 'Aria',  avatar: '👧', role: 'child',  theme: 'fun'   },
+};
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export const UserProvider = ({ children }: { children: ReactNode }) => {
-  const [isLoggedIn, setIsLoggedIn] = useState(() => localStorage.getItem('fh_auth') === 'true');
+  const [isLoggedIn, setIsLoggedIn] = useState(
+    () => localStorage.getItem('fh_auth') === 'true',
+  );
   const [user, setUser] = useState<User | null>(() => {
     const saved = localStorage.getItem('fh_user');
     return saved ? JSON.parse(saved) : null;
   });
+  const [isKidView, setIsKidView] = useState(false);
 
   const login = (username: string, password: string): boolean => {
-    if ((username === 'papa' || username === 'mama' || username === 'raul' || username === 'tania') && password === '1234') {
-      const name = username === 'papa' || username === 'raul' ? 'Raúl' : 'Tania';
-      const avatar = name === 'Raúl' ? '👨' : '👩';
-      const newUser: User = { id: username, name, avatar, role: 'parent', username, theme: 'light' };
-      setUser(newUser);
-      setIsLoggedIn(true);
-      localStorage.setItem('fh_auth', 'true');
-      localStorage.setItem('fh_user', JSON.stringify(newUser));
-      return true;
-    } else if ((username === 'alan' || username === 'aria') && password === '1234') {
-      const name = username.charAt(0).toUpperCase() + username.slice(1);
-      const newUser: User = { 
-        id: username, 
-        name, 
-        avatar: username === 'alan' ? '👦' : '👧', 
-        role: 'child', 
-        username,
-        theme: 'fun'
-      };
-      setUser(newUser);
-      setIsLoggedIn(true);
-      localStorage.setItem('fh_auth', 'true');
-      localStorage.setItem('fh_user', JSON.stringify(newUser));
-      return true;
-    }
-    return false;
+    const profile = USERS[username.toLowerCase()];
+    if (!profile || password !== '1234') return false;
+    const newUser: User = { id: username, username: username.toLowerCase(), ...profile };
+    setUser(newUser);
+    setIsLoggedIn(true);
+    setIsKidView(false);
+    localStorage.setItem('fh_auth', 'true');
+    localStorage.setItem('fh_user', JSON.stringify(newUser));
+    return true;
   };
 
   const logout = () => {
     setIsLoggedIn(false);
     setUser(null);
+    setIsKidView(false);
     localStorage.removeItem('fh_auth');
     localStorage.removeItem('fh_user');
   };
 
-  const setRole = (role: Role) => {
-    if (user) {
-      const updated = { ...user, role };
-      setUser(updated);
-      localStorage.setItem('fh_user', JSON.stringify(updated));
-    }
-  };
-
   const updateTheme = (theme: Theme) => {
-    if (user) {
-      const updated = { ...user, theme };
-      setUser(updated);
-      localStorage.setItem('fh_user', JSON.stringify(updated));
-    }
+    if (!user) return;
+    const updated = { ...user, theme };
+    setUser(updated);
+    localStorage.setItem('fh_user', JSON.stringify(updated));
   };
 
-  const role = user?.role || 'parent';
-  const currentTheme = user?.theme || 'light';
+  // Solo padres pueden cambiar a vista de niños
+  const enterKidView = () => {
+    if (user?.role === 'parent') setIsKidView(true);
+  };
+
+  const exitKidView = () => setIsKidView(false);
+
+  const realRole: Role = user?.role || 'parent';
+  // Si el padre está en modo niño, el viewMode es 'child'; los niños siempre son 'child'
+  const viewMode: Role = realRole === 'child' ? 'child' : isKidView ? 'child' : 'parent';
+
+  const currentTheme: Theme =
+    viewMode === 'child' ? 'fun' : (user?.theme ?? 'light');
 
   return (
-    <UserContext.Provider value={{ role, setRole, user, login, logout, isLoggedIn, updateTheme }}>
-      <div className={`theme-${currentTheme} role-${role}`} style={{ minHeight: '100vh' }}>
+    <UserContext.Provider value={{
+      role: realRole,
+      viewMode,
+      isKidView,
+      user,
+      login,
+      logout,
+      isLoggedIn,
+      updateTheme,
+      enterKidView,
+      exitKidView,
+    }}>
+      <div className={`theme-${currentTheme}`} style={{ minHeight: '100svh' }}>
         {children}
       </div>
     </UserContext.Provider>

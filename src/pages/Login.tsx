@@ -11,62 +11,113 @@ const Login = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const success = login(username, password);
-    if (!success) {
-      setError('Usuario o contraseña incorrectos');
-    }
+    if (!success) setError('Usuario o contraseña incorrectos');
+  };
+
+  const quickLogin = (user: string) => {
+    setUsername(user);
+    setPassword('1234');
+    login(user, '1234');
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', padding: '1rem' }}>
-      <div className="card" style={{ width: '100%', maxWidth: '400px', padding: '2.5rem', textAlign: 'center' }}>
-        <div className="logo" style={{ justifyContent: 'center', marginBottom: '1.5rem' }}>
-          <Home size={32} strokeWidth={3} />
-          <span style={{ fontSize: '1.75rem' }}>FamilyHub</span>
+    <div style={{
+      minHeight: '100svh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'linear-gradient(135deg, #eef2ff 0%, #f8fafc 60%, #f0fdf4 100%)',
+      padding: '1rem',
+    }}>
+      <div style={{ width: '100%', maxWidth: '400px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <div style={{
+            width: '56px', height: '56px',
+            background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+            borderRadius: '16px',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            marginBottom: '1rem',
+            boxShadow: '0 8px 20px rgba(79,70,229,0.3)',
+          }}>
+            <Home size={28} color="white" strokeWidth={2.5} />
+          </div>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: '800', color: '#0f172a', letterSpacing: '-0.03em' }}>
+            FamilyHub
+          </h1>
+          <p style={{ color: '#64748b', fontSize: '0.9rem', marginTop: '0.25rem' }}>
+            Bienvenida familia — inicia sesión
+          </p>
         </div>
-        <h2 style={{ marginBottom: '0.5rem', fontWeight: '800' }}>¡Bienvenida Familia!</h2>
-        <p style={{ color: 'var(--p-text-muted)', marginBottom: '2rem', fontSize: '0.9rem' }}>Inicia sesión para administrar tu hogar</p>
-        
-        <form onSubmit={handleSubmit} style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <div>
-            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.5rem', color: 'var(--p-text)' }}>Usuario</label>
-            <div style={{ position: 'relative' }}>
-              <User style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} size={18} />
-              <input 
-                required
-                type="text" 
-                value={username}
-                onChange={(e) => setUsername(e.target.value.toLowerCase())}
-                placeholder="papa, mama, mateo o sofia"
-                style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.5rem', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '1rem' }}
-              />
+
+        <div className="card" style={{ padding: '2rem' }}>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div className="form-group">
+              <label className="form-label">Usuario</label>
+              <div style={{ position: 'relative' }}>
+                <User size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                <input
+                  required
+                  type="text"
+                  value={username}
+                  onChange={e => setUsername(e.target.value.toLowerCase())}
+                  placeholder="raul, tania, alan o aria"
+                  style={{ paddingLeft: '2.25rem' }}
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Contraseña</label>
+              <div style={{ position: 'relative' }}>
+                <Lock size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                <input
+                  required
+                  type="password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="••••"
+                  style={{ paddingLeft: '2.25rem' }}
+                />
+              </div>
+            </div>
+
+            {error && (
+              <p style={{ color: 'var(--danger)', fontSize: '0.8125rem', fontWeight: '600', textAlign: 'center' }}>
+                {error}
+              </p>
+            )}
+
+            <button type="submit" className="btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '0.75rem' }}>
+              Entrar al Hogar
+            </button>
+          </form>
+
+          <div style={{ marginTop: '1.5rem' }}>
+            <p style={{ fontSize: '0.75rem', color: '#94a3b8', textAlign: 'center', marginBottom: '0.75rem' }}>
+              Acceso rápido (demo)
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+              {[
+                { id: 'raul', label: '👨 Raúl', color: '#eef2ff', text: '#4f46e5' },
+                { id: 'tania', label: '👩 Tania', color: '#fdf2f8', text: '#db2777' },
+                { id: 'alan', label: '👦 Alan', color: '#eff6ff', text: '#2563eb' },
+                { id: 'aria', label: '👧 Aria', color: '#fff7ed', text: '#ea580c' },
+              ].map(u => (
+                <button
+                  key={u.id}
+                  onClick={() => quickLogin(u.id)}
+                  style={{
+                    background: u.color, color: u.text, border: 'none',
+                    borderRadius: '8px', padding: '0.5rem', fontWeight: '700',
+                    fontSize: '0.8125rem', cursor: 'pointer', fontFamily: 'inherit',
+                  }}
+                >
+                  {u.label}
+                </button>
+              ))}
             </div>
           </div>
-          
-          <div>
-            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.5rem', color: 'var(--p-text)' }}>Contraseña</label>
-            <div style={{ position: 'relative' }}>
-              <Lock style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} size={18} />
-              <input 
-                required
-                type="password" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Contraseña"
-                style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.5rem', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '1rem' }}
-              />
-            </div>
-          </div>
-
-          {error && <p style={{ color: '#ef4444', fontSize: '0.8rem', fontWeight: '600', textAlign: 'center' }}>{error}</p>}
-
-          <button type="submit" className="btn-primary" style={{ padding: '1rem', fontSize: '1rem', marginTop: '0.5rem' }}>
-            Entrar al Hogar
-          </button>
-        </form>
-
-        <p style={{ marginTop: '2rem', fontSize: '0.75rem', color: 'var(--p-text-muted)' }}>
-          Tip: Prueba con 'papa' y '1234'
-        </p>
+        </div>
       </div>
     </div>
   );

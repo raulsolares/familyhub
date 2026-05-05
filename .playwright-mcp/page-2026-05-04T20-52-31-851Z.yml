@@ -1,0 +1,497 @@
+- generic [ref=e4]:
+  - complementary [ref=e5]:
+    - generic [ref=e6]:
+      - img [ref=e7]
+      - generic [ref=e10]: FamilyHub
+    - navigation [ref=e11]:
+      - link "Dashboard" [ref=e12] [cursor=pointer]:
+        - /url: /
+        - img [ref=e13]
+        - generic [ref=e18]: Dashboard
+      - link "Menú Semanal" [ref=e19] [cursor=pointer]:
+        - /url: /menu
+        - img [ref=e20]
+        - generic [ref=e23]: Menú Semanal
+      - link "Lista de Súper" [ref=e24] [cursor=pointer]:
+        - /url: /shopping
+        - img [ref=e25]
+        - generic [ref=e29]: Lista de Súper
+      - link "Módulo Escolar" [ref=e30] [cursor=pointer]:
+        - /url: /school
+        - img [ref=e31]
+        - generic [ref=e34]: Módulo Escolar
+      - link "Tareas del Hogar" [ref=e35] [cursor=pointer]:
+        - /url: /chores
+        - img [ref=e36]
+        - generic [ref=e39]: Tareas del Hogar
+      - link "Premios y Castigos" [ref=e40] [cursor=pointer]:
+        - /url: /rewards
+        - img [ref=e41]
+        - generic [ref=e47]: Premios y Castigos
+      - link "Calendario" [ref=e48] [cursor=pointer]:
+        - /url: /calendar
+        - img [ref=e49]
+        - generic [ref=e51]: Calendario
+      - link "Configuración" [ref=e52] [cursor=pointer]:
+        - /url: /settings
+        - img [ref=e53]
+        - generic [ref=e56]: Configuración
+    - generic [ref=e57]:
+      - generic [ref=e58]:
+        - generic [ref=e59]: 👨
+        - generic [ref=e60]:
+          - paragraph [ref=e61]: Raúl
+          - paragraph [ref=e62]: Modo Padres
+      - button "Cambiar a Modo Niños" [ref=e63] [cursor=pointer]
+      - button "Salir del Hogar" [ref=e64] [cursor=pointer]:
+        - img [ref=e65]
+        - text: Salir del Hogar
+  - main [ref=e68]:
+    - generic [ref=e69]:
+      - generic [ref=e70]:
+        - heading "Planificación Alimenticia" [level=1] [ref=e71]
+        - paragraph [ref=e72]: Menú personalizado para cada miembro de la familia
+      - generic [ref=e73]:
+        - heading "📅 Resumen de HOY (Lunes)" [level=3] [ref=e74]
+        - generic [ref=e75]:
+          - generic [ref=e77]:
+            - generic [ref=e78]: R
+            - heading "Raúl" [level=4] [ref=e79]
+          - generic [ref=e81]:
+            - generic [ref=e82]: T
+            - heading "Tania" [level=4] [ref=e83]
+          - generic [ref=e85]:
+            - generic [ref=e86]: A
+            - heading "Alan" [level=4] [ref=e87]
+          - generic [ref=e89]:
+            - generic [ref=e90]: A
+            - heading "Aria" [level=4] [ref=e91]
+      - table [ref=e93]:
+        - rowgroup [ref=e94]:
+          - row "Miembro / Comida Lunes Martes Miércoles Jueves Viernes Sábado Domingo" [ref=e95]:
+            - columnheader "Miembro / Comida" [ref=e96]
+            - columnheader "Lunes" [ref=e97]
+            - columnheader "Martes" [ref=e98]
+            - columnheader "Miércoles" [ref=e99]
+            - columnheader "Jueves" [ref=e100]
+            - columnheader "Viernes" [ref=e101]
+            - columnheader "Sábado" [ref=e102]
+            - columnheader "Domingo" [ref=e103]
+        - rowgroup [ref=e104]:
+          - row "Raúl" [ref=e105]:
+            - cell "Raúl" [ref=e106]:
+              - generic [ref=e107]:
+                - img [ref=e108]
+                - text: Raúl
+          - row "Desayuno" [ref=e111]:
+            - cell "Desayuno" [ref=e112]
+            - cell [ref=e113]:
+              - img [ref=e115] [cursor=pointer]
+            - cell [ref=e116]:
+              - img [ref=e118] [cursor=pointer]
+            - cell [ref=e119]:
+              - img [ref=e121] [cursor=pointer]
+            - cell [ref=e122]:
+              - img [ref=e124] [cursor=pointer]
+            - cell [ref=e125]:
+              - img [ref=e127] [cursor=pointer]
+            - cell [ref=e128]:
+              - img [ref=e130] [cursor=pointer]
+            - cell [ref=e131]:
+              - img [ref=e133] [cursor=pointer]
+          - row "Snack" [ref=e134]:
+            - cell "Snack" [ref=e135]
+            - cell [ref=e136]:
+              - img [ref=e138] [cursor=pointer]
+            - cell [ref=e139]:
+              - img [ref=e141] [cursor=pointer]
+            - cell [ref=e142]:
+              - img [ref=e144] [cursor=pointer]
+            - cell [ref=e145]:
+              - img [ref=e147] [cursor=pointer]
+            - cell [ref=e148]:
+              - img [ref=e150] [cursor=pointer]
+            - cell [ref=e151]:
+              - img [ref=e153] [cursor=pointer]
+            - cell [ref=e154]:
+              - img [ref=e156] [cursor=pointer]
+          - row "Lunch" [ref=e157]:
+            - cell "Lunch" [ref=e158]
+            - cell [ref=e159]:
+              - img [ref=e161] [cursor=pointer]
+            - cell [ref=e162]:
+              - img [ref=e164] [cursor=pointer]
+            - cell [ref=e165]:
+              - img [ref=e167] [cursor=pointer]
+            - cell [ref=e168]:
+              - img [ref=e170] [cursor=pointer]
+            - cell [ref=e171]:
+              - img [ref=e173] [cursor=pointer]
+            - cell [ref=e174]:
+              - img [ref=e176] [cursor=pointer]
+            - cell [ref=e177]:
+              - img [ref=e179] [cursor=pointer]
+          - row "Comida" [ref=e180]:
+            - cell "Comida" [ref=e181]
+            - cell [ref=e182]:
+              - img [ref=e184] [cursor=pointer]
+            - cell [ref=e185]:
+              - img [ref=e187] [cursor=pointer]
+            - cell [ref=e188]:
+              - img [ref=e190] [cursor=pointer]
+            - cell [ref=e191]:
+              - img [ref=e193] [cursor=pointer]
+            - cell [ref=e194]:
+              - img [ref=e196] [cursor=pointer]
+            - cell [ref=e197]:
+              - img [ref=e199] [cursor=pointer]
+            - cell [ref=e200]:
+              - img [ref=e202] [cursor=pointer]
+          - row "Merienda" [ref=e203]:
+            - cell "Merienda" [ref=e204]
+            - cell [ref=e205]:
+              - img [ref=e207] [cursor=pointer]
+            - cell [ref=e208]:
+              - img [ref=e210] [cursor=pointer]
+            - cell [ref=e211]:
+              - img [ref=e213] [cursor=pointer]
+            - cell [ref=e214]:
+              - img [ref=e216] [cursor=pointer]
+            - cell [ref=e217]:
+              - img [ref=e219] [cursor=pointer]
+            - cell [ref=e220]:
+              - img [ref=e222] [cursor=pointer]
+            - cell [ref=e223]:
+              - img [ref=e225] [cursor=pointer]
+          - row "Cena" [ref=e226]:
+            - cell "Cena" [ref=e227]
+            - cell [ref=e228]:
+              - img [ref=e230] [cursor=pointer]
+            - cell [ref=e231]:
+              - img [ref=e233] [cursor=pointer]
+            - cell [ref=e234]:
+              - img [ref=e236] [cursor=pointer]
+            - cell [ref=e237]:
+              - img [ref=e239] [cursor=pointer]
+            - cell [ref=e240]:
+              - img [ref=e242] [cursor=pointer]
+            - cell [ref=e243]:
+              - img [ref=e245] [cursor=pointer]
+            - cell [ref=e246]:
+              - img [ref=e248] [cursor=pointer]
+          - row "Tania" [ref=e249]:
+            - cell "Tania" [ref=e250]:
+              - generic [ref=e251]:
+                - img [ref=e252]
+                - text: Tania
+          - row "Desayuno" [ref=e255]:
+            - cell "Desayuno" [ref=e256]
+            - cell [ref=e257]:
+              - img [ref=e259] [cursor=pointer]
+            - cell [ref=e260]:
+              - img [ref=e262] [cursor=pointer]
+            - cell [ref=e263]:
+              - img [ref=e265] [cursor=pointer]
+            - cell [ref=e266]:
+              - img [ref=e268] [cursor=pointer]
+            - cell [ref=e269]:
+              - img [ref=e271] [cursor=pointer]
+            - cell [ref=e272]:
+              - img [ref=e274] [cursor=pointer]
+            - cell [ref=e275]:
+              - img [ref=e277] [cursor=pointer]
+          - row "Snack" [ref=e278]:
+            - cell "Snack" [ref=e279]
+            - cell [ref=e280]:
+              - img [ref=e282] [cursor=pointer]
+            - cell [ref=e283]:
+              - img [ref=e285] [cursor=pointer]
+            - cell [ref=e286]:
+              - img [ref=e288] [cursor=pointer]
+            - cell [ref=e289]:
+              - img [ref=e291] [cursor=pointer]
+            - cell [ref=e292]:
+              - img [ref=e294] [cursor=pointer]
+            - cell [ref=e295]:
+              - img [ref=e297] [cursor=pointer]
+            - cell [ref=e298]:
+              - img [ref=e300] [cursor=pointer]
+          - row "Lunch" [ref=e301]:
+            - cell "Lunch" [ref=e302]
+            - cell [ref=e303]:
+              - img [ref=e305] [cursor=pointer]
+            - cell [ref=e306]:
+              - img [ref=e308] [cursor=pointer]
+            - cell [ref=e309]:
+              - img [ref=e311] [cursor=pointer]
+            - cell [ref=e312]:
+              - img [ref=e314] [cursor=pointer]
+            - cell [ref=e315]:
+              - img [ref=e317] [cursor=pointer]
+            - cell [ref=e318]:
+              - img [ref=e320] [cursor=pointer]
+            - cell [ref=e321]:
+              - img [ref=e323] [cursor=pointer]
+          - row "Comida" [ref=e324]:
+            - cell "Comida" [ref=e325]
+            - cell [ref=e326]:
+              - img [ref=e328] [cursor=pointer]
+            - cell [ref=e329]:
+              - img [ref=e331] [cursor=pointer]
+            - cell [ref=e332]:
+              - img [ref=e334] [cursor=pointer]
+            - cell [ref=e335]:
+              - img [ref=e337] [cursor=pointer]
+            - cell [ref=e338]:
+              - img [ref=e340] [cursor=pointer]
+            - cell [ref=e341]:
+              - img [ref=e343] [cursor=pointer]
+            - cell [ref=e344]:
+              - img [ref=e346] [cursor=pointer]
+          - row "Merienda" [ref=e347]:
+            - cell "Merienda" [ref=e348]
+            - cell [ref=e349]:
+              - img [ref=e351] [cursor=pointer]
+            - cell [ref=e352]:
+              - img [ref=e354] [cursor=pointer]
+            - cell [ref=e355]:
+              - img [ref=e357] [cursor=pointer]
+            - cell [ref=e358]:
+              - img [ref=e360] [cursor=pointer]
+            - cell [ref=e361]:
+              - img [ref=e363] [cursor=pointer]
+            - cell [ref=e364]:
+              - img [ref=e366] [cursor=pointer]
+            - cell [ref=e367]:
+              - img [ref=e369] [cursor=pointer]
+          - row "Cena" [ref=e370]:
+            - cell "Cena" [ref=e371]
+            - cell [ref=e372]:
+              - img [ref=e374] [cursor=pointer]
+            - cell [ref=e375]:
+              - img [ref=e377] [cursor=pointer]
+            - cell [ref=e378]:
+              - img [ref=e380] [cursor=pointer]
+            - cell [ref=e381]:
+              - img [ref=e383] [cursor=pointer]
+            - cell [ref=e384]:
+              - img [ref=e386] [cursor=pointer]
+            - cell [ref=e387]:
+              - img [ref=e389] [cursor=pointer]
+            - cell [ref=e390]:
+              - img [ref=e392] [cursor=pointer]
+          - row "Alan" [ref=e393]:
+            - cell "Alan" [ref=e394]:
+              - generic [ref=e395]:
+                - img [ref=e396]
+                - text: Alan
+          - row "Desayuno" [ref=e399]:
+            - cell "Desayuno" [ref=e400]
+            - cell [ref=e401]:
+              - img [ref=e403] [cursor=pointer]
+            - cell [ref=e404]:
+              - img [ref=e406] [cursor=pointer]
+            - cell [ref=e407]:
+              - img [ref=e409] [cursor=pointer]
+            - cell [ref=e410]:
+              - img [ref=e412] [cursor=pointer]
+            - cell [ref=e413]:
+              - img [ref=e415] [cursor=pointer]
+            - cell [ref=e416]:
+              - img [ref=e418] [cursor=pointer]
+            - cell [ref=e419]:
+              - img [ref=e421] [cursor=pointer]
+          - row "Snack" [ref=e422]:
+            - cell "Snack" [ref=e423]
+            - cell [ref=e424]:
+              - img [ref=e426] [cursor=pointer]
+            - cell [ref=e427]:
+              - img [ref=e429] [cursor=pointer]
+            - cell [ref=e430]:
+              - img [ref=e432] [cursor=pointer]
+            - cell [ref=e433]:
+              - img [ref=e435] [cursor=pointer]
+            - cell [ref=e436]:
+              - img [ref=e438] [cursor=pointer]
+            - cell [ref=e439]:
+              - img [ref=e441] [cursor=pointer]
+            - cell [ref=e442]:
+              - img [ref=e444] [cursor=pointer]
+          - row "Lunch" [ref=e445]:
+            - cell "Lunch" [ref=e446]
+            - cell [ref=e447]:
+              - img [ref=e449] [cursor=pointer]
+            - cell [ref=e450]:
+              - img [ref=e452] [cursor=pointer]
+            - cell [ref=e453]:
+              - img [ref=e455] [cursor=pointer]
+            - cell [ref=e456]:
+              - img [ref=e458] [cursor=pointer]
+            - cell [ref=e459]:
+              - img [ref=e461] [cursor=pointer]
+            - cell [ref=e462]:
+              - img [ref=e464] [cursor=pointer]
+            - cell [ref=e465]:
+              - img [ref=e467] [cursor=pointer]
+          - row "Comida" [ref=e468]:
+            - cell "Comida" [ref=e469]
+            - cell [ref=e470]:
+              - img [ref=e472] [cursor=pointer]
+            - cell [ref=e473]:
+              - img [ref=e475] [cursor=pointer]
+            - cell [ref=e476]:
+              - img [ref=e478] [cursor=pointer]
+            - cell [ref=e479]:
+              - img [ref=e481] [cursor=pointer]
+            - cell [ref=e482]:
+              - img [ref=e484] [cursor=pointer]
+            - cell [ref=e485]:
+              - img [ref=e487] [cursor=pointer]
+            - cell [ref=e488]:
+              - img [ref=e490] [cursor=pointer]
+          - row "Merienda" [ref=e491]:
+            - cell "Merienda" [ref=e492]
+            - cell [ref=e493]:
+              - img [ref=e495] [cursor=pointer]
+            - cell [ref=e496]:
+              - img [ref=e498] [cursor=pointer]
+            - cell [ref=e499]:
+              - img [ref=e501] [cursor=pointer]
+            - cell [ref=e502]:
+              - img [ref=e504] [cursor=pointer]
+            - cell [ref=e505]:
+              - img [ref=e507] [cursor=pointer]
+            - cell [ref=e508]:
+              - img [ref=e510] [cursor=pointer]
+            - cell [ref=e511]:
+              - img [ref=e513] [cursor=pointer]
+          - row "Cena" [ref=e514]:
+            - cell "Cena" [ref=e515]
+            - cell [ref=e516]:
+              - img [ref=e518] [cursor=pointer]
+            - cell [ref=e519]:
+              - img [ref=e521] [cursor=pointer]
+            - cell [ref=e522]:
+              - img [ref=e524] [cursor=pointer]
+            - cell [ref=e525]:
+              - img [ref=e527] [cursor=pointer]
+            - cell [ref=e528]:
+              - img [ref=e530] [cursor=pointer]
+            - cell [ref=e531]:
+              - img [ref=e533] [cursor=pointer]
+            - cell [ref=e534]:
+              - img [ref=e536] [cursor=pointer]
+          - row "Aria" [ref=e537]:
+            - cell "Aria" [ref=e538]:
+              - generic [ref=e539]:
+                - img [ref=e540]
+                - text: Aria
+          - row "Desayuno" [ref=e543]:
+            - cell "Desayuno" [ref=e544]
+            - cell [ref=e545]:
+              - img [ref=e547] [cursor=pointer]
+            - cell [ref=e548]:
+              - img [ref=e550] [cursor=pointer]
+            - cell [ref=e551]:
+              - img [ref=e553] [cursor=pointer]
+            - cell [ref=e554]:
+              - img [ref=e556] [cursor=pointer]
+            - cell [ref=e557]:
+              - img [ref=e559] [cursor=pointer]
+            - cell [ref=e560]:
+              - img [ref=e562] [cursor=pointer]
+            - cell [ref=e563]:
+              - img [ref=e565] [cursor=pointer]
+          - row "Snack" [ref=e566]:
+            - cell "Snack" [ref=e567]
+            - cell [ref=e568]:
+              - img [ref=e570] [cursor=pointer]
+            - cell [ref=e571]:
+              - img [ref=e573] [cursor=pointer]
+            - cell [ref=e574]:
+              - img [ref=e576] [cursor=pointer]
+            - cell [ref=e577]:
+              - img [ref=e579] [cursor=pointer]
+            - cell [ref=e580]:
+              - img [ref=e582] [cursor=pointer]
+            - cell [ref=e583]:
+              - img [ref=e585] [cursor=pointer]
+            - cell [ref=e586]:
+              - img [ref=e588] [cursor=pointer]
+          - row "Lunch" [ref=e589]:
+            - cell "Lunch" [ref=e590]
+            - cell [ref=e591]:
+              - img [ref=e593] [cursor=pointer]
+            - cell [ref=e594]:
+              - img [ref=e596] [cursor=pointer]
+            - cell [ref=e597]:
+              - img [ref=e599] [cursor=pointer]
+            - cell [ref=e600]:
+              - img [ref=e602] [cursor=pointer]
+            - cell [ref=e603]:
+              - img [ref=e605] [cursor=pointer]
+            - cell [ref=e606]:
+              - img [ref=e608] [cursor=pointer]
+            - cell [ref=e609]:
+              - img [ref=e611] [cursor=pointer]
+          - row "Comida" [ref=e612]:
+            - cell "Comida" [ref=e613]
+            - cell [ref=e614]:
+              - img [ref=e616] [cursor=pointer]
+            - cell [ref=e617]:
+              - img [ref=e619] [cursor=pointer]
+            - cell [ref=e620]:
+              - img [ref=e622] [cursor=pointer]
+            - cell [ref=e623]:
+              - img [ref=e625] [cursor=pointer]
+            - cell [ref=e626]:
+              - img [ref=e628] [cursor=pointer]
+            - cell [ref=e629]:
+              - img [ref=e631] [cursor=pointer]
+            - cell [ref=e632]:
+              - img [ref=e634] [cursor=pointer]
+          - row "Merienda" [ref=e635]:
+            - cell "Merienda" [ref=e636]
+            - cell [ref=e637]:
+              - img [ref=e639] [cursor=pointer]
+            - cell [ref=e640]:
+              - img [ref=e642] [cursor=pointer]
+            - cell [ref=e643]:
+              - img [ref=e645] [cursor=pointer]
+            - cell [ref=e646]:
+              - img [ref=e648] [cursor=pointer]
+            - cell [ref=e649]:
+              - img [ref=e651] [cursor=pointer]
+            - cell [ref=e652]:
+              - img [ref=e654] [cursor=pointer]
+            - cell [ref=e655]:
+              - img [ref=e657] [cursor=pointer]
+          - row "Cena" [ref=e658]:
+            - cell "Cena" [ref=e659]
+            - cell [ref=e660]:
+              - img [ref=e662] [cursor=pointer]
+            - cell [ref=e663]:
+              - img [ref=e665] [cursor=pointer]
+            - cell [ref=e666]:
+              - img [ref=e668] [cursor=pointer]
+            - cell [ref=e669]:
+              - img [ref=e671] [cursor=pointer]
+            - cell [ref=e672]:
+              - img [ref=e674] [cursor=pointer]
+            - cell [ref=e675]:
+              - img [ref=e677] [cursor=pointer]
+            - cell [ref=e678]:
+              - img [ref=e680] [cursor=pointer]
+      - generic [ref=e681]:
+        - generic [ref=e682]:
+          - heading "📖 Catálogo de Alimentos" [level=3] [ref=e683]
+          - paragraph [ref=e684]: Gestiona los ingredientes detallados para tu lista de súper.
+          - link "Ir al Catálogo" [ref=e685] [cursor=pointer]:
+            - /url: /food
+            - button "Ir al Catálogo" [ref=e686]
+        - generic [ref=e687]:
+          - heading "🛒 Lista de Súper Inteligente" [level=3] [ref=e688]
+          - paragraph [ref=e689]: Calcula automáticamente las cantidades basadas en todo el menú familiar.
+          - link "Ver Lista" [ref=e690] [cursor=pointer]:
+            - /url: /shopping
+            - button "Ver Lista" [ref=e691]

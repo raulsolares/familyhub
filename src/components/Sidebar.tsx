@@ -1,85 +1,78 @@
 import { NavLink } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  Utensils, 
-  ShoppingCart, 
-  GraduationCap, 
-  CheckSquare, 
-  Trophy, 
-  Calendar as CalendarIcon,
-  Home,
-  Settings as SettingsIcon,
-  LogOut
+import {
+  LayoutDashboard, Utensils, ShoppingCart, GraduationCap,
+  CheckSquare, Trophy, Calendar, Settings, LogOut, Clock, Eye, EyeOff, Home,
 } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 
-const Sidebar = () => {
-  const { role, setRole, user, logout } = useUser();
+const navItems = [
+  { to: '/',         icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/menu',     icon: Utensils,        label: 'Menú Semanal' },
+  { to: '/shopping', icon: ShoppingCart,    label: 'Lista de Súper' },
+  { to: '/school',   icon: GraduationCap,  label: 'Módulo Escolar' },
+  { to: '/chores',   icon: CheckSquare,    label: 'Tareas del Hogar' },
+  { to: '/routines', icon: Clock,          label: 'Rutinas' },
+  { to: '/rewards',  icon: Trophy,         label: 'Premios y Puntos' },
+  { to: '/calendar', icon: Calendar,       label: 'Calendario' },
+  { to: '/settings', icon: Settings,       label: 'Configuración' },
+];
 
-  const navItems = [
-    { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-    { to: '/menu', icon: Utensils, label: 'Menú Semanal' },
-    { to: '/shopping', icon: ShoppingCart, label: 'Lista de Súper' },
-    { to: '/school', icon: GraduationCap, label: 'Módulo Escolar' },
-    { to: '/chores', icon: CheckSquare, label: 'Tareas del Hogar' },
-    { to: '/rewards', icon: Trophy, label: 'Premios y Castigos' },
-    { to: '/calendar', icon: CalendarIcon, label: 'Calendario' },
-    { to: '/settings', icon: SettingsIcon, label: 'Configuración' },
-  ];
+const Sidebar = () => {
+  const { user, logout, isKidView, enterKidView, exitKidView } = useUser();
 
   return (
     <aside className="sidebar">
       <div className="logo">
-        <Home size={28} strokeWidth={3} />
+        <Home size={22} strokeWidth={2.5} />
         <span>FamilyHub</span>
       </div>
-      
+
+      <p className="nav-group-label">Menú principal</p>
+
       <nav className="nav-links">
-        {navItems.map((item) => (
-          <NavLink 
-            key={item.to} 
-            to={item.to} 
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+        {navItems.map(item => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.to === '/'}
+            className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
           >
-            <item.icon size={22} />
+            <item.icon size={18} />
             <span>{item.label}</span>
           </NavLink>
         ))}
       </nav>
 
       <div className="user-switcher">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-          <div style={{ 
-            width: '40px', 
-            height: '40px', 
-            borderRadius: '50%', 
-            background: role === 'parent' ? '#eef2ff' : '#fff1f2',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '1.2rem'
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginBottom: '0.75rem' }}>
+          <div style={{
+            width: '36px', height: '36px', borderRadius: '50%',
+            background: 'var(--p-primary-50)', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', flexShrink: 0,
           }}>
-            {user?.avatar || '👤'}
+            {user?.avatar}
           </div>
-          <div>
-            <p style={{ fontWeight: '700', fontSize: '0.9rem' }}>{user?.name || 'Usuario'}</p>
-            <p style={{ fontSize: '0.75rem', color: 'var(--p-text-muted)' }}>
-              Modo {role === 'parent' ? 'Padres' : 'Niños'}
-            </p>
+          <div style={{ minWidth: 0 }}>
+            <p style={{ fontWeight: '700', fontSize: '0.875rem', color: 'var(--p-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.name}</p>
+            <p style={{ fontSize: '0.7rem', color: 'var(--p-text-muted)' }}>Modo Padres</p>
           </div>
         </div>
-        <button 
-          onClick={() => setRole(role === 'parent' ? 'child' : 'parent')}
-          className="btn-primary"
-          style={{ width: '100%', fontSize: '0.85rem' }}
+
+        <button
+          onClick={isKidView ? exitKidView : enterKidView}
+          className="btn-secondary"
+          style={{ width: '100%', justifyContent: 'center', fontSize: '0.8rem', marginBottom: '0.5rem' }}
         >
-          Cambiar a {role === 'parent' ? 'Modo Niños' : 'Modo Padres'}
+          {isKidView ? <><EyeOff size={14} /> Vista Padres</> : <><Eye size={14} /> Vista Niños</>}
         </button>
-        <button 
+
+        <button
           onClick={logout}
-          style={{ marginTop: '1rem', width: '100%', padding: '0.5rem', background: 'none', border: '1px solid #fee2e2', color: '#ef4444', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontWeight: '600', fontSize: '0.85rem' }}
+          className="btn-icon"
+          style={{ width: '100%', justifyContent: 'center', color: 'var(--danger)', gap: '0.375rem', padding: '0.5rem' }}
         >
-          <LogOut size={16} /> Salir del Hogar
+          <LogOut size={15} />
+          <span style={{ fontSize: '0.8125rem', fontWeight: '600' }}>Salir del Hogar</span>
         </button>
       </div>
     </aside>

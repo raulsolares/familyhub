@@ -4,17 +4,19 @@ import KidNav from './KidNav';
 import { useUser } from '../context/UserContext';
 
 const Layout = () => {
-  const { role } = useUser();
+  const { viewMode } = useUser();
+  const isKid = viewMode === 'child';
+
   return (
     <div className="app-container">
-      {role === 'parent' && <Sidebar />}
-      <main className="main-content" style={{ 
-        padding: role === 'child' ? '1rem 1rem 80px' : '2.5rem',
-        width: '100%' 
-      }}>
+      {!isKid && <Sidebar />}
+      <main
+        className="main-content"
+        style={{ padding: isKid ? '1.25rem 1rem 90px' : '2.5rem' }}
+      >
         <Outlet />
       </main>
-      {role === 'child' && <KidNav />}
+      {isKid && <KidNav />}
     </div>
   );
 };

@@ -1,0 +1,107 @@
+- generic [ref=e30]:
+  - complementary [ref=e31]:
+    - generic [ref=e32]:
+      - img [ref=e33]
+      - generic [ref=e36]: FamilyHub
+    - navigation [ref=e37]:
+      - link "Dashboard" [ref=e38] [cursor=pointer]:
+        - /url: /
+        - img [ref=e39]
+        - generic [ref=e44]: Dashboard
+      - link "Menú Semanal" [ref=e45] [cursor=pointer]:
+        - /url: /menu
+        - img [ref=e46]
+        - generic [ref=e49]: Menú Semanal
+      - link "Lista de Súper" [ref=e50] [cursor=pointer]:
+        - /url: /shopping
+        - img [ref=e51]
+        - generic [ref=e55]: Lista de Súper
+      - link "Módulo Escolar" [ref=e56] [cursor=pointer]:
+        - /url: /school
+        - img [ref=e57]
+        - generic [ref=e60]: Módulo Escolar
+      - link "Tareas del Hogar" [ref=e61] [cursor=pointer]:
+        - /url: /chores
+        - img [ref=e62]
+        - generic [ref=e65]: Tareas del Hogar
+      - link "Premios y Castigos" [ref=e66] [cursor=pointer]:
+        - /url: /rewards
+        - img [ref=e67]
+        - generic [ref=e73]: Premios y Castigos
+      - link "Calendario" [ref=e74] [cursor=pointer]:
+        - /url: /calendar
+        - img [ref=e75]
+        - generic [ref=e77]: Calendario
+      - link "Configuración" [ref=e78] [cursor=pointer]:
+        - /url: /settings
+        - img [ref=e79]
+        - generic [ref=e82]: Configuración
+    - generic [ref=e83]:
+      - generic [ref=e84]:
+        - generic [ref=e85]: 👨
+        - generic [ref=e86]:
+          - paragraph [ref=e87]: Raúl
+          - paragraph [ref=e88]: Modo Padres
+      - button "Cambiar a Modo Niños" [ref=e89] [cursor=pointer]
+      - button "Salir del Hogar" [ref=e90] [cursor=pointer]:
+        - img [ref=e91]
+        - text: Salir del Hogar
+  - main [ref=e94]:
+    - generic [ref=e95]:
+      - generic [ref=e96]:
+        - generic [ref=e97]:
+          - heading "Centro de Comando" [level=1] [ref=e98]
+          - paragraph [ref=e99]: Panel de administración familiar premium
+        - generic [ref=e100]:
+          - paragraph [ref=e101]: lunes, 4 de mayo
+          - text: Hogar Sincronizado
+      - generic [ref=e102]:
+        - generic [ref=e103]:
+          - generic [ref=e104]:
+            - heading "Notificaciones y Vencimientos" [level=3] [ref=e105]:
+              - img [ref=e106]
+              - text: Notificaciones y Vencimientos
+            - link "Ver todo" [ref=e109] [cursor=pointer]:
+              - /url: /school
+          - paragraph [ref=e111]: No hay pendientes urgentes. ✨
+        - generic [ref=e112]:
+          - heading "Rendimiento Familiar" [level=3] [ref=e113]:
+            - img [ref=e114]
+            - text: Rendimiento Familiar
+          - generic [ref=e117]:
+            - generic [ref=e119]:
+              - generic [ref=e120]: Alan
+              - generic [ref=e121]: 0 pts
+            - generic [ref=e124]:
+              - generic [ref=e125]: Aria
+              - generic [ref=e126]: 0 pts
+            - generic [ref=e129]:
+              - generic [ref=e130]: Raúl
+              - generic [ref=e131]: 0 pts
+            - generic [ref=e134]:
+              - generic [ref=e135]: Tania
+              - generic [ref=e136]: 0 pts
+            - link "Gestionar Premios" [ref=e138] [cursor=pointer]:
+              - /url: /rewards
+        - generic [ref=e139]:
+          - heading "Menú de Hoy (Lunes)" [level=3] [ref=e140]:
+            - img [ref=e141]
+            - text: Menú de Hoy (Lunes)
+          - generic [ref=e144]:
+            - generic [ref=e145]:
+              - paragraph [ref=e146]: Desayuno
+              - paragraph [ref=e147]: Sin asignar
+            - generic [ref=e148]:
+              - paragraph [ref=e149]: Comida
+              - paragraph [ref=e150]: Sin asignar
+            - generic [ref=e151]:
+              - paragraph [ref=e152]: Cena
+              - paragraph [ref=e153]: Sin asignar
+            - link "Ver menú completo" [ref=e154] [cursor=pointer]:
+              - /url: /menu
+        - generic [ref=e155]:
+          - heading "Tareas del Hogar" [level=3] [ref=e156]:
+            - img [ref=e157]
+            - text: Tareas del Hogar
+          - link "Gestionar todas las tareas" [ref=e161] [cursor=pointer]:
+            - /url: /chores

@@ -1,219 +1,307 @@
 import { useState } from 'react';
-import { Backpack, BookOpen, PartyPopper, Clock, Calendar, X } from 'lucide-react';
+import { Clock, Calendar, X, Plus, Tag, CheckCircle2, Circle, Edit2, Trash2, Settings2 } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useData } from '../context/DataContext';
 import type { SchoolTask } from '../context/DataContext';
 
+const categoryColors: Record<string, { bg: string; text: string }> = {
+  'Llevar material': { bg: '#eff6ff', text: '#1d4ed8' },
+  'Pagar':           { bg: '#fff7ed', text: '#c2410c' },
+  'Examen':          { bg: '#fdf2f8', text: '#9d174d' },
+  'Evento':          { bg: '#f0fdf4', text: '#166534' },
+  'Sin clases':      { bg: '#fef9c3', text: '#713f12' },
+  'Tarea':           { bg: '#f5f3ff', text: '#6d28d9' },
+  'Otro':            { bg: '#f1f5f9', text: '#475569' },
+};
+
+const getCategoryStyle = (cat: string) =>
+  categoryColors[cat] || { bg: '#f1f5f9', text: '#475569' };
+
+const getDaysLeft = (dateStr: string) => {
+  if (!dateStr) return 9999;
+  const today = new Date(); today.setHours(0,0,0,0);
+  return Math.ceil((new Date(dateStr).getTime() - today.getTime()) / 86400000);
+};
+
 const SchoolHub = () => {
   const { role } = useUser();
-  const { schoolTasks, addSchoolTask, updateSchoolTask, deleteSchoolTask, toggleSchoolTask, members } = useData();
+  const {
+    schoolTasks, addSchoolTask, updateSchoolTask, deleteSchoolTask,
+    toggleSchoolTask, members, schoolCategories, updateSchoolCategories,
+  } = useData();
 
   const children = members.filter(m => m.role === 'child');
-  const defaultChild = children.length > 0 ? children[0].name : '';
+  const defaultChild = children[0]?.name || '';
 
   const [showForm, setShowForm] = useState(false);
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [editingTask, setEditingTask] = useState<SchoolTask | null>(null);
+  const [filterChild, setFilterChild] = useState<string>('Todos');
+  const [filterCat, setFilterCat] = useState<string>('Todas');
+  const [newCatInput, setNewCatInput] = useState('');
 
-  // Form states
+  // Form fields
   const [child, setChild] = useState(defaultChild);
   const [title, setTitle] = useState('');
   const [desc, setDesc] = useState('');
-  const [date, setDate] = useState('');
-  const [type, setType] = useState<string>('material');
+  const [eventDate, setEventDate] = useState('');
+  const [deadline, setDeadline] = useState('');
+  const [category, setCategory] = useState(schoolCategories[0] || 'Otro');
+
+  const reset = () => {
+    setChild(defaultChild); setTitle(''); setDesc('');
+    setEventDate(''); setDeadline(''); setCategory(schoolCategories[0] || 'Otro');
+    setEditingTask(null); setShowForm(false);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const taskData = { child, title, desc, date, type };
-
-    if (editingTask) {
-      updateSchoolTask(editingTask.id, taskData);
-    } else {
-      addSchoolTask(taskData);
-    }
-    
-    resetForm();
-  };
-
-  const resetForm = () => {
-    setChild(defaultChild);
-    setTitle('');
-    setDesc('');
-    setDate('');
-    setType('material');
-    setEditingTask(null);
-    setShowForm(false);
+    const data = { child, title, desc, eventDate, deadline: deadline || eventDate, category };
+    editingTask ? updateSchoolTask(editingTask.id, data) : addSchoolTask(data);
+    reset();
   };
 
   const handleEdit = (task: SchoolTask) => {
     setEditingTask(task);
-    setChild(task.child);
-    setTitle(task.title);
-    setDesc(task.desc);
-    setDate(task.date);
-    setType(task.type);
+    setChild(task.child); setTitle(task.title); setDesc(task.desc);
+    setEventDate(task.eventDate || ''); setDeadline(task.deadline || '');
+    setCategory(task.category || schoolCategories[0]);
     setShowForm(true);
   };
 
-  const pendingTasks = schoolTasks.filter(t => !t.completed && t.type !== 'social');
-  const socialEvents = schoolTasks.filter(t => t.type === 'social');
+  const pendingTasks = schoolTasks
+    .filter(t => !t.completed)
+    .filter(t => filterChild === 'Todos' || t.child === filterChild)
+    .filter(t => filterCat === 'Todas' || t.category === filterCat)
+    .map(t => ({ ...t, daysLeft: getDaysLeft(t.deadline || t.eventDate) }))
+    .sort((a, b) => a.daysLeft - b.daysLeft);
+
+  const doneTasks = schoolTasks.filter(t => t.completed);
 
   return (
     <div>
-      <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <h1 className="page-title">Módulo Escolar</h1>
-          <p className="page-subtitle">Tareas, materiales y eventos académicos con fechas reales</p>
+          <p className="page-subtitle">Pendientes, materiales y eventos académicos</p>
         </div>
         {role === 'parent' && (
-          <button className="btn-primary" onClick={() => setShowForm(true)}>+ Agregar Pendiente</button>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button className="btn-secondary" onClick={() => setShowCategoryManager(true)}>
+              <Settings2 size={15} /> Categorías
+            </button>
+            <button className="btn-primary" onClick={() => setShowForm(true)}>
+              <Plus size={15} /> Agregar
+            </button>
+          </div>
         )}
       </header>
 
-      {/* Modal Form */}
+      {/* Filtros */}
+      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+        <div className="tab-list">
+          {['Todos', ...children.map(c => c.name)].map(name => (
+            <button
+              key={name}
+              className={`tab-btn${filterChild === name ? ' active' : ''}`}
+              onClick={() => setFilterChild(name)}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+        <div className="tab-list">
+          {['Todas', ...schoolCategories].map(cat => (
+            <button
+              key={cat}
+              className={`tab-btn${filterCat === cat ? ' active' : ''}`}
+              onClick={() => setFilterCat(cat)}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Modal: formulario */}
       {showForm && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
-          <div className="card" style={{ width: '100%', maxWidth: '500px', position: 'relative' }}>
-            <button onClick={resetForm} style={{ position: 'absolute', right: '1rem', top: '1rem', background: 'none', border: 'none', cursor: 'pointer' }}><X /></button>
-            <h3 className="card-title" style={{ marginBottom: '1.5rem' }}>{editingTask ? 'Editar Pendiente' : 'Nuevo Pendiente'}</h3>
+        <div className="modal-overlay">
+          <div className="modal-card">
+            <button className="modal-close" onClick={reset}><X size={16} /></button>
+            <h3 style={{ fontWeight: '700', fontSize: '1.1rem', marginBottom: '1.25rem' }}>
+              {editingTask ? 'Editar pendiente' : 'Nuevo pendiente escolar'}
+            </h3>
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.4rem' }}>Niño</label>
-                <select value={child} onChange={(e) => setChild(e.target.value)} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #ddd' }}>
-                  <option>Mateo</option>
-                  <option>Sofía</option>
+              <div className="form-group">
+                <label className="form-label">Niño/a</label>
+                <select value={child} onChange={e => setChild(e.target.value)}>
+                  {children.map(c => <option key={c.id}>{c.name}</option>)}
                 </select>
               </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.4rem' }}>Título</label>
-                <input required value={title} onChange={(e) => setTitle(e.target.value)} type="text" style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #ddd' }} />
+              <div className="form-group">
+                <label className="form-label">Categoría</label>
+                <select value={category} onChange={e => setCategory(e.target.value)}>
+                  {schoolCategories.map(cat => <option key={cat}>{cat}</option>)}
+                </select>
               </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.4rem' }}>Descripción</label>
-                <textarea value={desc} onChange={(e) => setDesc(e.target.value)} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #ddd', minHeight: '60px' }} />
+              <div className="form-group">
+                <label className="form-label">Título *</label>
+                <input required value={title} onChange={e => setTitle(e.target.value)} placeholder="Ej: Traer carpeta roja" />
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.4rem' }}>Fecha del Evento</label>
-                  <input 
-                    required 
-                    value={date} 
-                    onChange={(e) => setDate(e.target.value)} 
-                    type="date" 
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #ddd' }} 
-                  />
+              <div className="form-group">
+                <label className="form-label">Descripción / Detalles</label>
+                <textarea value={desc} onChange={e => setDesc(e.target.value)} placeholder="Detalles adicionales..." />
+              </div>
+              <div className="grid-2">
+                <div className="form-group">
+                  <label className="form-label">Fecha del evento *</label>
+                  <input required type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} />
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.4rem' }}>Tipo / Categoría</label>
-                  <input 
-                    required 
-                    value={type} 
-                    onChange={(e) => setType(e.target.value)} 
-                    type="text" 
-                    placeholder="Ej: Examen, Material, Social..."
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--p-background)', color: 'var(--p-text)' }} 
-                  />
+                <div className="form-group">
+                  <label className="form-label">Fecha límite de entrega</label>
+                  <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} />
+                  <p style={{ fontSize: '0.7rem', color: 'var(--p-text-muted)', marginTop: '0.25rem' }}>
+                    Si vacío, igual a fecha del evento
+                  </p>
                 </div>
               </div>
-              <button type="submit" className="btn-primary" style={{ marginTop: '1rem' }}>
-                {editingTask ? 'Guardar Cambios' : 'Crear Pendiente'}
+              <button type="submit" className="btn-primary" style={{ marginTop: '0.5rem', justifyContent: 'center' }}>
+                {editingTask ? 'Guardar cambios' : 'Crear pendiente'}
               </button>
             </form>
           </div>
         </div>
       )}
 
-      <div className="grid">
-        <div className="card" style={{ gridColumn: 'span 2' }}>
-          <h3 className="card-title"><Clock size={20} color="var(--p-primary)" /> Próximos Pendientes</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
-            {pendingTasks.map(item => (
-              <div key={item.id} style={{ 
-                padding: '1.25rem', 
-                background: '#f8fafc', 
-                borderRadius: '16px', 
-                border: '1px solid rgba(0,0,0,0.05)',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start'
-              }}>
-                <div style={{ flex: 1, display: 'flex', gap: '1rem' }}>
-                  <div 
-                    onClick={() => toggleSchoolTask(item.id)}
-                    style={{ 
-                      marginTop: '0.2rem',
-                      width: '24px', 
-                      height: '24px', 
-                      borderRadius: '50%', 
-                      border: '2px solid #cbd5e1',
-                      cursor: 'pointer'
-                    }} 
-                  />
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                      <span style={{ 
-                        padding: '0.2rem 0.6rem', 
-                        borderRadius: '999px', 
-                        fontSize: '0.7rem', 
-                        fontWeight: '700',
-                        background: item.child === 'Alan' ? '#eef2ff' : '#fff1f2',
-                        color: item.child === 'Alan' ? '#4f46e5' : '#f43f5e'
-                      }}>
-                        {item.child}
-                      </span>
-                      <h4 style={{ fontWeight: '700', fontSize: '1rem' }}>{item.title}</h4>
-                    </div>
-                    <p style={{ fontSize: '0.875rem', color: 'var(--p-text-muted)', marginBottom: '0.75rem' }}>
-                      {item.desc}
-                    </p>
-                    <div style={{ display: 'flex', gap: '1rem' }}>
-                      <span style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#ef4444', fontWeight: '600' }}>
-                        <Calendar size={14} /> Fecha: {new Date(item.date).toLocaleDateString()}
-                      </span>
-                      <span style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem', color: 'var(--p-text-muted)' }}>
-                        {item.type === 'material' ? <Backpack size={14}/> : <BookOpen size={14}/>} 
-                        {item.type === 'material' ? 'Material' : 'Académico'}
-                      </span>
-                    </div>
-                  </div>
+      {/* Modal: categorías */}
+      {showCategoryManager && (
+        <div className="modal-overlay">
+          <div className="modal-card">
+            <button className="modal-close" onClick={() => setShowCategoryManager(false)}><X size={16} /></button>
+            <h3 style={{ fontWeight: '700', fontSize: '1.1rem', marginBottom: '1.25rem' }}>
+              <Tag size={18} style={{ verticalAlign: 'middle', marginRight: '0.5rem' }} />
+              Gestionar Categorías
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
+              {schoolCategories.map(cat => (
+                <div key={cat} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.625rem 0.875rem', background: 'var(--p-background)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+                  <span style={{ ...getCategoryStyle(cat), background: 'none', fontWeight: '600', fontSize: '0.875rem', color: getCategoryStyle(cat).text }}>
+                    {cat}
+                  </span>
+                  <button
+                    className="btn-icon"
+                    onClick={() => updateSchoolCategories(schoolCategories.filter(c => c !== cat))}
+                    style={{ color: 'var(--danger)' }}
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
-                {role === 'parent' && (
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button onClick={() => handleEdit(item)} style={{ background: 'none', border: 'none', color: 'var(--p-text-muted)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '600' }}>Editar</button>
-                    <button onClick={() => deleteSchoolTask(item.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '600' }}>Borrar</button>
-                  </div>
-                )}
-              </div>
-            ))}
-            {pendingTasks.length === 0 && (
-              <p style={{ textAlign: 'center', color: 'var(--p-text-muted)' }}>No hay pendientes académicos en este momento.</p>
-            )}
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <input
+                value={newCatInput}
+                onChange={e => setNewCatInput(e.target.value)}
+                placeholder="Nueva categoría..."
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && newCatInput.trim()) {
+                    updateSchoolCategories([...schoolCategories, newCatInput.trim()]);
+                    setNewCatInput('');
+                  }
+                }}
+              />
+              <button
+                className="btn-primary"
+                onClick={() => { if (newCatInput.trim()) { updateSchoolCategories([...schoolCategories, newCatInput.trim()]); setNewCatInput(''); }}}
+              >
+                <Plus size={16} />
+              </button>
+            </div>
           </div>
         </div>
+      )}
 
-        <div className="card">
-          <h3 className="card-title"><PartyPopper size={20} color="#f59e0b" /> Eventos Sociales</h3>
-          <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {socialEvents.map(item => (
-              <div key={item.id} style={{ background: '#fffbeb', border: '1px solid #fef3c7', padding: '1rem', borderRadius: '12px', position: 'relative' }}>
-                {role === 'parent' && (
-                  <button onClick={() => deleteSchoolTask(item.id)} style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', background: 'none', border: 'none', cursor: 'pointer', color: '#b45309' }}><X size={16} /></button>
-                )}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
-                  <span style={{ fontWeight: '700', color: '#92400e' }}>{item.title}</span>
-                  <span style={{ fontSize: '0.6rem', padding: '0.1rem 0.4rem', background: '#fef3c7', color: '#b45309', borderRadius: '4px', fontWeight: '800' }}>{item.child}</span>
+      {/* Lista de pendientes */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '2rem' }}>
+        {pendingTasks.length === 0 && (
+          <div className="card">
+            <div className="empty-state">
+              <CheckCircle2 size={36} color="var(--success)" style={{ margin: '0 auto 0.5rem' }} />
+              <h3 style={{ fontWeight: '700' }}>Sin pendientes</h3>
+              <p>¡Excelente! No hay pendientes escolares en este momento.</p>
+            </div>
+          </div>
+        )}
+
+        {pendingTasks.map(task => {
+          const catStyle = getCategoryStyle(task.category);
+          const isUrgent = task.daysLeft <= 2;
+          return (
+            <div key={task.id} className="card" style={{ borderLeft: `3px solid ${isUrgent ? 'var(--danger)' : 'transparent'}`, padding: '1.125rem 1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
+                <button
+                  onClick={() => toggleSchoolTask(task.id)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', marginTop: '0.125rem', flexShrink: 0 }}
+                >
+                  <Circle size={22} color="var(--border)" strokeWidth={2} />
+                </button>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.375rem' }}>
+                    <span className="badge" style={{ background: catStyle.bg, color: catStyle.text }}>{task.category}</span>
+                    <span className="badge badge-blue">{task.child}</span>
+                    {isUrgent && <span className="badge badge-red">URGENTE</span>}
+                  </div>
+                  <h4 style={{ fontWeight: '700', fontSize: '0.9375rem', marginBottom: '0.25rem' }}>{task.title}</h4>
+                  {task.desc && <p style={{ fontSize: '0.8125rem', color: 'var(--p-text-muted)', marginBottom: '0.5rem' }}>{task.desc}</p>}
+                  <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--p-text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <Calendar size={13} /> Evento: {task.eventDate ? new Date(task.eventDate).toLocaleDateString('es-MX') : '—'}
+                    </span>
+                    {task.deadline && task.deadline !== task.eventDate && (
+                      <span style={{ fontSize: '0.75rem', color: isUrgent ? 'var(--danger)' : 'var(--p-text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: isUrgent ? '700' : '400' }}>
+                        <Clock size={13} /> Límite: {new Date(task.deadline).toLocaleDateString('es-MX')}
+                        {task.daysLeft >= 0 && ` (${task.daysLeft === 0 ? 'hoy' : `${task.daysLeft}d`})`}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <p style={{ fontSize: '0.8rem', color: '#b45309' }}>{new Date(item.date).toLocaleDateString()}</p>
-                <p style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>
-                  <strong>Detalles:</strong> {item.desc}
-                </p>
+                {role === 'parent' && (
+                  <div style={{ display: 'flex', gap: '0.25rem', flexShrink: 0 }}>
+                    <button className="btn-icon" onClick={() => handleEdit(task)}><Edit2 size={14} /></button>
+                    <button className="btn-icon" onClick={() => deleteSchoolTask(task.id)} style={{ color: 'var(--danger)' }}><Trash2 size={14} /></button>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Completados */}
+      {doneTasks.length > 0 && (
+        <div>
+          <h3 style={{ fontWeight: '700', fontSize: '0.875rem', color: 'var(--p-text-muted)', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Completados ({doneTasks.length})
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {doneTasks.map(task => (
+              <div key={task.id} style={{ padding: '0.875rem 1.125rem', background: 'var(--p-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', display: 'flex', alignItems: 'center', gap: '0.875rem', opacity: 0.6 }}>
+                <button onClick={() => toggleSchoolTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}>
+                  <CheckCircle2 size={22} color="var(--success)" />
+                </button>
+                <div>
+                  <span className="badge" style={{ marginBottom: '0.25rem', ...getCategoryStyle(task.category) }}>{task.category}</span>
+                  <p style={{ fontWeight: '600', fontSize: '0.875rem', textDecoration: 'line-through', color: 'var(--p-text-muted)' }}>{task.title}</p>
+                </div>
+                <span className="badge badge-blue" style={{ marginLeft: 'auto' }}>{task.child}</span>
+                {role === 'parent' && (
+                  <button className="btn-icon" onClick={() => deleteSchoolTask(task.id)} style={{ color: 'var(--danger)' }}><Trash2 size={14} /></button>
+                )}
               </div>
             ))}
-            {socialEvents.length === 0 && (
-              <p style={{ textAlign: 'center', color: 'var(--p-text-muted)', fontSize: '0.85rem' }}>Sin eventos sociales próximos.</p>
-            )}
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
