@@ -1,12 +1,13 @@
 import { useState, useRef } from 'react';
-import { Search, Edit2, Trash2, UtensilsCrossed, X, Minus, Star, Clock, AlertCircle } from 'lucide-react';
+import { Search, Edit2, Trash2, UtensilsCrossed, X, Minus, Star, Clock, AlertCircle, BarChart2, TrendingUp, Flame } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useData } from '../context/DataContext';
 import type { Food, Ingredient } from '../context/DataContext';
 
 const FoodManager = () => {
   const { role } = useUser();
-  const { foods, addFood, deleteFood, updateFood, ingredientItems, addIngredientItem } = useData();
+  const { foods, addFood, deleteFood, updateFood, ingredientItems, addIngredientItem, weeklyMenu, members } = useData();
+  const [activeTab, setActiveTab] = useState<'catalogo' | 'estadisticas'>('catalogo');
   const [activeIngSuggest, setActiveIngSuggest] = useState<number | null>(null);
   const suggestRef = useRef<HTMLDivElement>(null);
   
@@ -99,16 +100,45 @@ const FoodManager = () => {
     return a.name.localeCompare(b.name);
   });
 
+  // ── ESTADÍSTICAS SEMANALES ───────────────────────────────────────────────────
+  // kcal por persona y frecuencia por platillo para la semana visible en weeklyMenu
+  const statsPerMember: Record<string, { kcal: number; meals: number }> = {};
+  const statsPerFood: Record<string, { food: Food; count: number; memberNames: string[] }> = {};
+  members.forEach(m => { statsPerMember[m.name] = { kcal: 0, meals: 0 }; });
+
+  weeklyMenu.forEach(slot => {
+    if (!statsPerMember[slot.member]) return;
+    slot.foodIds.forEach(fid => {
+      const food = foods.find(f => f.id === fid);
+      if (!food) return;
+      const qty = slot.quantities?.[fid] || 1;
+      if (food.calories) statsPerMember[slot.member].kcal += food.calories * qty;
+      statsPerMember[slot.member].meals += qty;
+      if (!statsPerFood[fid]) statsPerFood[fid] = { food, count: 0, memberNames: [] };
+      statsPerFood[fid].count += qty;
+      if (!statsPerFood[fid].memberNames.includes(slot.member)) statsPerFood[fid].memberNames.push(slot.member);
+    });
+  });
+
+  const sortedFoodStats = Object.values(statsPerFood).sort((a, b) => b.count - a.count);
+  const maxKcal = Math.max(...Object.values(statsPerMember).map(s => s.kcal), 1);
+
   return (
     <div>
       <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h1 className="page-title">Catálogo de Alimentos</h1>
-          <p className="page-subtitle">Base de datos nutricional y logística de comidas</p>
+          <h1 className="page-title">Alimentos</h1>
+          <p className="page-subtitle">Catálogo nutricional y estadísticas de consumo</p>
         </div>
-        {role === 'parent' && (
-          <button className="btn-primary" onClick={() => setShowForm(true)}>+ Nuevo Platillo</button>
-        )}
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <div className="tab-list">
+            <button className={`tab-btn${activeTab === 'catalogo' ? ' active' : ''}`} onClick={() => setActiveTab('catalogo')}><UtensilsCrossed size={13} style={{ marginRight: 4 }} />Catálogo</button>
+            <button className={`tab-btn${activeTab === 'estadisticas' ? ' active' : ''}`} onClick={() => setActiveTab('estadisticas')}><BarChart2 size={13} style={{ marginRight: 4 }} />Estadísticas</button>
+          </div>
+          {role === 'parent' && activeTab === 'catalogo' && (
+            <button className="btn-primary" onClick={() => setShowForm(true)}>+ Nuevo Platillo</button>
+          )}
+        </div>
       </header>
 
       {/* Modal Form */}
@@ -232,66 +262,158 @@ const FoodManager = () => {
         </div>
       )}
 
-      <div className="card" style={{ marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <div style={{ flex: 1, position: 'relative' }}>
-            <Search style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--p-text-muted)' }} size={18} />
-            <input 
-              type="text" 
-              placeholder="Buscar platillo por nombre..." 
-              style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.5rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--p-background)', color: 'var(--p-text)' }}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))' }}>
-        {sortedFoods.filter(f => f.name.toLowerCase().includes(searchTerm.toLowerCase())).map(food => (
-          <div key={food.id} className="card" style={{ border: food.isFavorite ? '2px solid #f59e0b' : '1px solid var(--border)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-              <div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginBottom: '0.5rem' }}>
-                  {food.isFavorite && <Star size={14} fill="#f59e0b" color="#f59e0b" />}
-                  {food.categories?.map(cat => (
-                     <span key={cat} style={{ fontSize: '0.65rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--p-primary)', background: 'var(--p-background)', padding: '0.2rem 0.4rem', borderRadius: '4px' }}>
-                       {cat}
-                     </span>
-                  ))}
-                </div>
-                <h3 style={{ fontWeight: '800', fontSize: '1.25rem' }}>{food.name}</h3>
-                {(food.calories || food.prepTime || food.maxPerWeek) && (
-                  <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.3rem', fontSize: '0.75rem', color: 'var(--p-text-muted)', fontWeight: '600' }}>
-                    {food.prepTime && <span><Clock size={10}/> {food.prepTime} min</span>}
-                    {food.calories && <span>🔥 {food.calories} kcal</span>}
-                    {food.maxPerWeek && <span style={{ color: '#ef4444' }}><AlertCircle size={10}/> Max {food.maxPerWeek}/sem</span>}
-                  </div>
-                )}
+      {/* ── TAB: CATÁLOGO ── */}
+      {activeTab === 'catalogo' && (
+        <>
+          <div className="card" style={{ marginBottom: '2rem' }}>
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+              <div style={{ flex: 1, position: 'relative' }}>
+                <Search style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--p-text-muted)' }} size={18} />
+                <input
+                  type="text"
+                  placeholder="Buscar platillo por nombre..."
+                  style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.5rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--p-background)', color: 'var(--p-text)' }}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
               </div>
-              {role === 'parent' && (
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button onClick={() => handleEdit(food)} style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--p-background)', cursor: 'pointer', color: 'var(--p-text)' }}><Edit2 size={14} /></button>
-                  <button onClick={() => deleteFood(food.id)} style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid #fecaca', background: 'white', cursor: 'pointer', color: '#ef4444' }}><Trash2 size={14} /></button>
+            </div>
+          </div>
+
+          <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))' }}>
+            {sortedFoods.filter(f => f.name.toLowerCase().includes(searchTerm.toLowerCase())).map(food => (
+              <div key={food.id} className="card" style={{ border: food.isFavorite ? '2px solid #f59e0b' : '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                  <div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginBottom: '0.5rem' }}>
+                      {food.isFavorite && <Star size={14} fill="#f59e0b" color="#f59e0b" />}
+                      {food.categories?.map(cat => (
+                        <span key={cat} style={{ fontSize: '0.65rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--p-primary)', background: 'var(--p-background)', padding: '0.2rem 0.4rem', borderRadius: '4px' }}>
+                          {cat}
+                        </span>
+                      ))}
+                    </div>
+                    <h3 style={{ fontWeight: '800', fontSize: '1.25rem' }}>{food.name}</h3>
+                    {(food.calories || food.prepTime || food.maxPerWeek) && (
+                      <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.3rem', fontSize: '0.75rem', color: 'var(--p-text-muted)', fontWeight: '600' }}>
+                        {food.prepTime && <span><Clock size={10} /> {food.prepTime} min</span>}
+                        {food.calories && <span><Flame size={10} color="#f97316" /> {food.calories} kcal</span>}
+                        {food.maxPerWeek && <span style={{ color: '#ef4444' }}><AlertCircle size={10} /> Max {food.maxPerWeek}/sem</span>}
+                      </div>
+                    )}
+                  </div>
+                  {role === 'parent' && (
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button onClick={() => handleEdit(food)} style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--p-background)', cursor: 'pointer', color: 'var(--p-text)' }}><Edit2 size={14} /></button>
+                      <button onClick={() => deleteFood(food.id)} style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid #fecaca', background: 'white', cursor: 'pointer', color: '#ef4444' }}><Trash2 size={14} /></button>
+                    </div>
+                  )}
                 </div>
+
+                <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'var(--p-background)', borderRadius: '12px' }}>
+                  <p style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--p-text-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.5rem' }}>
+                    <UtensilsCrossed size={12} /> INGREDIENTES ({food.ingredients.length})
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                    {food.ingredients.map((ing, i) => (
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', borderBottom: '1px dashed var(--border)', paddingBottom: '0.2rem' }}>
+                        <span>{ing.name}</span>
+                        <span style={{ fontWeight: '800', color: 'var(--p-primary)' }}>{ing.amount} {ing.unit}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* ── TAB: ESTADÍSTICAS ── */}
+      {activeTab === 'estadisticas' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+
+          {/* Kcal por persona */}
+          <div className="card">
+            <h3 className="card-title" style={{ marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Flame size={16} color="#f97316" /> Calorías esta semana por persona
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {members.map(m => {
+                const stat = statsPerMember[m.name] || { kcal: 0, meals: 0 };
+                const pct = maxKcal > 0 ? (stat.kcal / maxKcal) * 100 : 0;
+                return (
+                  <div key={m.id}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.375rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontSize: '1.25rem' }}>{m.avatar}</span>
+                        <span style={{ fontWeight: '700', fontSize: '0.9rem' }}>{m.name}</span>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{ fontWeight: '800', fontSize: '1rem', color: 'var(--p-primary)' }}>{stat.kcal.toLocaleString()} kcal</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--p-text-muted)', marginLeft: '0.5rem' }}>{stat.meals} porciones</span>
+                      </div>
+                    </div>
+                    <div style={{ height: '10px', background: 'var(--p-background)', borderRadius: '999px', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${pct}%`, background: 'linear-gradient(90deg, var(--p-primary), #f97316)', borderRadius: '999px', transition: 'width 0.4s ease' }} />
+                    </div>
+                  </div>
+                );
+              })}
+              {Object.values(statsPerMember).every(s => s.kcal === 0) && (
+                <p style={{ color: 'var(--p-text-muted)', fontSize: '0.875rem', textAlign: 'center', padding: '1rem 0' }}>Sin datos calóricos en el menú de esta semana</p>
               )}
             </div>
-            
-            <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'var(--p-background)', borderRadius: '12px' }}>
-              <p style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--p-text-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.5rem' }}>
-                <UtensilsCrossed size={12} /> INGREDIENTES ({food.ingredients.length})
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                {food.ingredients.map((ing, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', borderBottom: '1px dashed var(--border)', paddingBottom: '0.2rem' }}>
-                    <span>{ing.name}</span>
-                    <span style={{ fontWeight: '800', color: 'var(--p-primary)' }}>{ing.amount} {ing.unit}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
-        ))}
-      </div>
+
+          {/* Frecuencia de platillos */}
+          <div className="card">
+            <h3 className="card-title" style={{ marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <TrendingUp size={16} color="var(--p-primary)" /> Platillos más consumidos esta semana
+            </h3>
+            {sortedFoodStats.length === 0 ? (
+              <p style={{ color: 'var(--p-text-muted)', fontSize: '0.875rem', textAlign: 'center', padding: '1rem 0' }}>Sin menú planificado para esta semana</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
+                {sortedFoodStats.map(({ food, count, memberNames }, idx) => {
+                  const pct = sortedFoodStats[0]?.count ? (count / sortedFoodStats[0].count) * 100 : 0;
+                  return (
+                    <div key={food.id} style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
+                      <span style={{ fontWeight: '800', fontSize: '0.75rem', color: 'var(--p-text-muted)', width: '1.25rem', textAlign: 'right' }}>{idx + 1}</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span style={{ fontWeight: '700', fontSize: '0.875rem' }}>{food.name}</span>
+                            <div style={{ display: 'flex', gap: '0.15rem' }}>
+                              {memberNames.map(n => {
+                                const mem = members.find(x => x.name === n);
+                                return <span key={n} title={n} style={{ fontSize: '0.875rem' }}>{mem?.avatar || '👤'}</span>;
+                              })}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            {food.calories && (
+                              <span style={{ fontSize: '0.7rem', color: 'var(--p-text-muted)', fontWeight: '600' }}>
+                                {food.calories * count} kcal total
+                              </span>
+                            )}
+                            <span style={{ fontWeight: '800', fontSize: '0.8rem', color: 'var(--p-primary)', background: 'var(--p-primary-50)', padding: '1px 8px', borderRadius: '9999px' }}>
+                              ×{count}
+                            </span>
+                          </div>
+                        </div>
+                        <div style={{ height: '6px', background: 'var(--p-background)', borderRadius: '999px', overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${pct}%`, background: 'var(--p-primary)', borderRadius: '999px', transition: 'width 0.4s ease' }} />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+        </div>
+      )}
     </div>
   );
 };
