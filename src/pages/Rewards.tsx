@@ -228,7 +228,13 @@ const Rewards = () => {
                         <button
                           className="btn-primary"
                           style={{ padding: '0.375rem 0.875rem', fontSize: '0.8rem' }}
-                          onClick={() => updatePrizeRequest(req.id, { status: 'approved' })}
+                          onClick={() => {
+                            updatePrizeRequest(req.id, { status: 'approved' });
+                            const prize = prizes.find(p => p.id === req.prizeId);
+                            if (prize) {
+                              addPointLog({ member: req.member, description: `Canje: ${prize.name}`, points: -prize.points });
+                            }
+                          }}
                         >
                           <CheckCircle size={14} /> Aprobar
                         </button>

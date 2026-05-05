@@ -11,37 +11,60 @@ import Settings from './pages/Settings';
 import FoodManager from './pages/FoodManager';
 import KidZone from './pages/KidZone';
 import KidDuel from './pages/KidDuel';
+import PrepView from './pages/PrepView';
 import Login from './pages/Login';
 import { useUser } from './context/UserContext';
 import { useData } from './context/DataContext';
-import { Bell, ChevronRight, Utensils, CheckCircle, TrendingUp } from 'lucide-react';
+import {
+  Bell, ChefHat, CheckSquare, TrendingUp, GraduationCap,
+  AlertTriangle, CheckCircle2, Clock, ArrowRight,
+} from 'lucide-react';
 import './styles/App.css';
 
 const Dashboard = () => {
   const { viewMode } = useUser();
-  const { schoolTasks, points, weeklyMenu, foods, chores } = useData();
+  const { schoolTasks, points, weeklyMenu, foods, chores, members, prizeRequests } = useData();
 
   if (viewMode === 'child') return <KidZone />;
 
   const getDaysLeft = (dateStr: string) => {
-    const today = new Date(); today.setHours(0,0,0,0);
-    const target = new Date(dateStr);
-    return Math.ceil((target.getTime() - today.getTime()) / 86400000);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    return Math.ceil((new Date(dateStr).getTime() - today.getTime()) / 86400000);
   };
 
-  const notifications = schoolTasks
+  const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+  const todayName = dayNames[new Date().getDay()];
+
+  const urgentTasks = schoolTasks
     .filter(t => !t.completed)
     .map(t => ({ ...t, daysLeft: getDaysLeft(t.eventDate || t.deadline) }))
-    .sort((a, b) => a.daysLeft - b.daysLeft)
-    .slice(0, 4);
+    .filter(t => t.daysLeft <= 3)
+    .sort((a, b) => a.daysLeft - b.daysLeft);
 
-  const dayNames = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
-  const today = dayNames[new Date().getDay()];
-  const todayMeals = weeklyMenu.filter(m => m.day === today);
+  const upcomingTasks = schoolTasks
+    .filter(t => !t.completed)
+    .map(t => ({ ...t, daysLeft: getDaysLeft(t.eventDate || t.deadline) }))
+    .filter(t => t.daysLeft > 3)
+    .sort((a, b) => a.daysLeft - b.daysLeft)
+    .slice(0, 3);
+
   const pendingChores = chores.filter(c => c.status === 'Pendiente');
+  const pendingPrizes = prizeRequests.filter(r => r.status === 'pending');
+
+  // Prep: qué hay para desayuno hoy por miembro
+  const breakfastSlots = members.map(m => {
+    const slot = weeklyMenu.find(w => w.day === todayName && w.meal === 'Desayuno' && w.member === m.name);
+    return { member: m, slot };
+  }).filter(x => x.slot && x.slot.foodIds.length > 0);
+
+  const lunchSlots = members.map(m => {
+    const slot = weeklyMenu.find(w => w.day === todayName && w.meal === 'Comida' && w.member === m.name);
+    return { member: m, slot };
+  }).filter(x => x.slot && x.slot.foodIds.length > 0);
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+      {/* Header */}
       <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
         <div>
           <h1 className="page-title">Centro de Comando</h1>
@@ -49,133 +72,216 @@ const Dashboard = () => {
             {new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}
           </p>
         </div>
-        <span className="badge badge-blue">Hogar Sincronizado</span>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          {pendingPrizes.length > 0 && (
+            <Link to="/rewards" className="badge badge-yellow" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+              <Bell size={12} /> {pendingPrizes.length} canje{pendingPrizes.length > 1 ? 's' : ''} pendiente{pendingPrizes.length > 1 ? 's' : ''}
+            </Link>
+          )}
+          <span className="badge badge-blue">Hogar Sincronizado</span>
+        </div>
       </header>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '1.25rem' }}>
-
-        {/* Notificaciones */}
-        <div className="card" style={{ gridColumn: 'span 8', borderLeft: '3px solid var(--danger)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-            <h3 className="card-title">
-              <Bell size={18} color="var(--danger)" /> Notificaciones y Vencimientos
-            </h3>
-            <Link to="/school" className="btn-ghost" style={{ padding: '0.25rem 0.625rem', fontSize: '0.8rem' }}>Ver todo</Link>
+      {/* Stat chips */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.875rem', marginBottom: '1.5rem' }}>
+        <Link to="/school" style={{ textDecoration: 'none' }}>
+          <div style={{ padding: '1rem 1.25rem', background: urgentTasks.length > 0 ? '#fef2f2' : 'var(--p-surface)', border: `1px solid ${urgentTasks.length > 0 ? '#fecaca' : 'var(--border)'}`, borderRadius: 'var(--radius)', display: 'flex', alignItems: 'center', gap: '0.75rem', transition: 'all 0.15s' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: 'var(--radius)', background: urgentTasks.length > 0 ? '#fee2e2' : 'var(--p-background)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              {urgentTasks.length > 0 ? <AlertTriangle size={18} color="var(--danger)" /> : <GraduationCap size={18} color="var(--p-text-muted)" />}
+            </div>
+            <div>
+              <p style={{ fontWeight: '800', fontSize: '1.25rem', lineHeight: 1, color: urgentTasks.length > 0 ? 'var(--danger)' : 'var(--p-text)' }}>{urgentTasks.length}</p>
+              <p style={{ fontSize: '0.75rem', color: 'var(--p-text-muted)', fontWeight: '600', marginTop: '0.125rem' }}>alerta{urgentTasks.length !== 1 ? 's' : ''} escolar{urgentTasks.length !== 1 ? 'es' : ''}</p>
+            </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {notifications.map(n => (
-              <div key={n.id} style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '0.875rem 1rem', background: 'var(--p-background)',
-                borderRadius: 'var(--radius)', border: '1px solid var(--border)',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
-                  <div style={{
-                    width: '40px', height: '40px', borderRadius: 'var(--radius)',
-                    background: n.daysLeft <= 1 ? 'var(--danger-bg)' : 'var(--p-surface-2)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontWeight: '800', color: n.daysLeft <= 1 ? 'var(--danger)' : 'var(--p-text-muted)',
-                    fontSize: '0.875rem',
-                  }}>
-                    {n.daysLeft < 0 ? '!' : n.daysLeft}
+        </Link>
+
+        <Link to="/chores" style={{ textDecoration: 'none' }}>
+          <div style={{ padding: '1rem 1.25rem', background: 'var(--p-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: 'var(--radius)', background: 'var(--p-background)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <CheckSquare size={18} color="var(--p-primary)" />
+            </div>
+            <div>
+              <p style={{ fontWeight: '800', fontSize: '1.25rem', lineHeight: 1 }}>{pendingChores.length}</p>
+              <p style={{ fontSize: '0.75rem', color: 'var(--p-text-muted)', fontWeight: '600', marginTop: '0.125rem' }}>tarea{pendingChores.length !== 1 ? 's' : ''} pendiente{pendingChores.length !== 1 ? 's' : ''}</p>
+            </div>
+          </div>
+        </Link>
+
+        <Link to="/prep" style={{ textDecoration: 'none' }}>
+          <div style={{ padding: '1rem 1.25rem', background: 'var(--p-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: 'var(--radius)', background: '#fff7ed', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <ChefHat size={18} color="var(--warning)" />
+            </div>
+            <div>
+              <p style={{ fontWeight: '700', fontSize: '0.875rem', lineHeight: 1 }}>Preparación</p>
+              <p style={{ fontSize: '0.75rem', color: 'var(--p-text-muted)', fontWeight: '600', marginTop: '0.125rem' }}>Vista cocina hoy</p>
+            </div>
+          </div>
+        </Link>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+
+        {/* Preparación del día — columna izquierda */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+          {/* Desayuno de hoy */}
+          <div className="card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 className="card-title">🌅 Desayuno de hoy</h3>
+              <Link to="/prep" className="btn-ghost" style={{ padding: '0.25rem 0.625rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                Prep completa <ArrowRight size={12} />
+              </Link>
+            </div>
+            {breakfastSlots.length === 0 ? (
+              <p style={{ fontSize: '0.85rem', color: 'var(--p-text-muted)', padding: '0.5rem 0' }}>Sin pedidos para desayuno</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {breakfastSlots.map(({ member, slot }) => (
+                  <div key={member.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.625rem 0.875rem', background: 'var(--p-background)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+                    <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>{member.avatar}</span>
+                    <span style={{ fontWeight: '600', fontSize: '0.8rem', color: 'var(--p-text-muted)', width: '50px', flexShrink: 0 }}>{member.name}</span>
+                    <span style={{ fontWeight: '600', fontSize: '0.875rem', flex: 1 }}>
+                      {slot!.foodIds.map(fid => {
+                        const qty = slot!.quantities?.[fid] || 1;
+                        const name = foods.find(f => f.id === fid)?.name || fid;
+                        return qty > 1 ? `${name} ×${qty}` : name;
+                      }).join(', ')}
+                    </span>
                   </div>
-                  <div>
-                    <p style={{ fontWeight: '700', fontSize: '0.9rem' }}>{n.title}
-                      <span className="badge badge-blue" style={{ marginLeft: '0.5rem' }}>{n.child}</span>
-                    </p>
-                    <p style={{ fontSize: '0.75rem', color: n.daysLeft <= 0 ? 'var(--danger)' : 'var(--p-text-muted)', marginTop: '0.125rem' }}>
-                      {n.daysLeft === 0 ? 'Vence HOY' : n.daysLeft < 0 ? 'VENCIDO' : `Faltan ${n.daysLeft} días`}
-                    </p>
+                ))}
+              </div>
+            )}
+
+            {/* Comida de hoy (compacta) */}
+            {lunchSlots.length > 0 && (
+              <>
+                <div style={{ marginTop: '1rem', marginBottom: '0.75rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+                  <p style={{ fontWeight: '700', fontSize: '0.8rem', color: 'var(--p-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>🍽️ Comida</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+                    {lunchSlots.map(({ member, slot }) => (
+                      <div key={member.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <span style={{ fontSize: '1rem' }}>{member.avatar}</span>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--p-text-muted)', width: '50px', flexShrink: 0 }}>{member.name}</span>
+                        <span style={{ fontSize: '0.8rem', fontWeight: '600' }}>
+                          {slot!.foodIds.map(fid => foods.find(f => f.id === fid)?.name || fid).join(', ')}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
-                <ChevronRight size={16} color="var(--p-text-subtle)" />
+              </>
+            )}
+          </div>
+
+          {/* Puntos — scoreboard compacto */}
+          <div className="card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.875rem' }}>
+              <h3 className="card-title"><TrendingUp size={16} color="var(--p-primary)" /> Puntos</h3>
+              <Link to="/rewards" className="btn-ghost" style={{ padding: '0.25rem 0.625rem', fontSize: '0.75rem' }}>Ver todo</Link>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
+              {members.map(m => {
+                const pts = points[m.name] || 0;
+                return (
+                  <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>{m.avatar}</span>
+                    <span style={{ fontWeight: '600', fontSize: '0.875rem', width: '60px', flexShrink: 0 }}>{m.name}</span>
+                    <div className="progress-bar" style={{ flex: 1 }}>
+                      <div className="progress-fill" style={{ width: `${Math.min((pts / 500) * 100, 100)}%` }} />
+                    </div>
+                    <span style={{ fontWeight: '700', fontSize: '0.8rem', color: 'var(--p-primary)', width: '48px', textAlign: 'right', flexShrink: 0 }}>{pts} pts</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Columna derecha */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+          {/* Alertas escolares */}
+          <div className="card" style={{ borderLeft: urgentTasks.length > 0 ? '3px solid var(--danger)' : '3px solid var(--border)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.875rem' }}>
+              <h3 className="card-title">
+                <Bell size={16} color={urgentTasks.length > 0 ? 'var(--danger)' : 'var(--p-text-muted)'} /> Escuela
+              </h3>
+              <Link to="/school" className="btn-ghost" style={{ padding: '0.25rem 0.625rem', fontSize: '0.75rem' }}>Ver todo</Link>
+            </div>
+
+            {urgentTasks.length === 0 && upcomingTasks.length === 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--p-text-muted)', padding: '0.5rem 0' }}>
+                <CheckCircle2 size={16} color="var(--success)" />
+                <span style={{ fontSize: '0.85rem' }}>Sin pendientes escolares</span>
               </div>
-            ))}
-            {notifications.length === 0 && (
-              <div className="empty-state">
-                <CheckCircle size={32} color="var(--success)" style={{ margin: '0 auto 0.5rem' }} />
-                <p>Sin pendientes urgentes</p>
+            )}
+
+            {urgentTasks.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: upcomingTasks.length > 0 ? '0.875rem' : 0 }}>
+                {urgentTasks.map(t => (
+                  <div key={t.id} style={{ padding: '0.625rem 0.875rem', background: '#fef2f2', borderRadius: 'var(--radius)', border: '1px solid #fecaca', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <p style={{ fontWeight: '700', fontSize: '0.85rem' }}>{t.title}</p>
+                      <div style={{ display: 'flex', gap: '0.375rem', marginTop: '0.2rem', alignItems: 'center' }}>
+                        <span className="badge badge-blue" style={{ fontSize: '0.65rem' }}>{t.child}</span>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--danger)', fontWeight: '700' }}>
+                          {t.daysLeft === 0 ? 'HOY' : t.daysLeft < 0 ? 'VENCIDO' : `${t.daysLeft}d`}
+                        </span>
+                      </div>
+                    </div>
+                    <AlertTriangle size={14} color="var(--danger)" />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {upcomingTasks.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+                {upcomingTasks.map(t => (
+                  <div key={t.id} style={{ padding: '0.5rem 0.75rem', background: 'var(--p-background)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <p style={{ fontWeight: '600', fontSize: '0.8rem' }}>{t.title}</p>
+                      <span className="badge badge-blue" style={{ fontSize: '0.6rem', marginTop: '0.15rem' }}>{t.child}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--p-text-muted)' }}>
+                      <Clock size={11} />
+                      <span style={{ fontSize: '0.7rem', fontWeight: '600' }}>{t.daysLeft}d</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
-        </div>
 
-        {/* Rendimiento */}
-        <div className="card" style={{ gridColumn: 'span 4' }}>
-          <h3 className="card-title" style={{ marginBottom: '1rem' }}>
-            <TrendingUp size={18} color="var(--p-primary)" /> Rendimiento
-          </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {['Alan', 'Aria', 'Raúl', 'Tania'].map(member => {
-              const pts = points[member] || 0;
-              return (
-                <div key={member}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.375rem' }}>
-                    <span style={{ fontWeight: '600', fontSize: '0.875rem' }}>{member}</span>
-                    <span style={{ fontWeight: '700', color: 'var(--p-primary)', fontSize: '0.875rem' }}>{pts} pts</span>
-                  </div>
-                  <div className="progress-bar">
-                    <div className="progress-fill" style={{ width: `${Math.min((pts / 500) * 100, 100)}%` }} />
-                  </div>
-                </div>
-              );
-            })}
-            <Link to="/rewards" className="btn-primary" style={{ justifyContent: 'center', marginTop: '0.5rem' }}>
-              Gestionar Premios
-            </Link>
-          </div>
-        </div>
-
-        {/* Menú de hoy */}
-        <div className="card" style={{ gridColumn: 'span 6' }}>
-          <h3 className="card-title" style={{ marginBottom: '1rem' }}>
-            <Utensils size={18} color="var(--warning)" /> Menú de Hoy ({today})
-          </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-            {['Desayuno', 'Comida', 'Cena'].map(meal => {
-              const item = todayMeals.find(m => m.meal === meal);
-              const foodName = item ? foods.find(f => f.id === item.foodIds[0])?.name : null;
-              return (
-                <div key={meal} style={{ padding: '0.75rem', background: 'var(--p-background)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
-                  <p style={{ fontSize: '0.65rem', fontWeight: '700', color: 'var(--p-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{meal}</p>
-                  <p style={{ fontWeight: '600', fontSize: '0.875rem', marginTop: '0.25rem', color: foodName ? 'var(--p-text)' : 'var(--p-text-subtle)' }}>
-                    {foodName || 'Sin asignar'}
-                  </p>
-                </div>
-              );
-            })}
-            <Link to="/menu" style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'var(--p-primary-50)', borderRadius: 'var(--radius)',
-              textDecoration: 'none', color: 'var(--p-primary)', fontWeight: '700', fontSize: '0.8rem',
-              border: '1px dashed var(--p-primary)', padding: '0.75rem',
-            }}>
-              Ver menú completo
-            </Link>
-          </div>
-        </div>
-
-        {/* Tareas pendientes */}
-        <div className="card" style={{ gridColumn: 'span 6' }}>
-          <h3 className="card-title" style={{ marginBottom: '1rem' }}>
-            <CheckCircle size={18} color="var(--success)" /> Tareas Pendientes
-          </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
-            {pendingChores.slice(0, 4).map(c => (
-              <div key={c.id} style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '0.75rem 0.875rem', background: 'var(--p-background)',
-                borderRadius: 'var(--radius)', border: '1px solid var(--border)',
-              }}>
-                <span style={{ fontWeight: '600', fontSize: '0.875rem' }}>{c.name}</span>
-                <span className="badge badge-blue">{c.user}</span>
+          {/* Tareas pendientes */}
+          <div className="card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.875rem' }}>
+              <h3 className="card-title"><CheckSquare size={16} color="var(--success)" /> Tareas del hogar</h3>
+              <Link to="/chores" className="btn-ghost" style={{ padding: '0.25rem 0.625rem', fontSize: '0.75rem' }}>Ver todo</Link>
+            </div>
+            {pendingChores.length === 0 ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--p-text-muted)', padding: '0.5rem 0' }}>
+                <CheckCircle2 size={16} color="var(--success)" />
+                <span style={{ fontSize: '0.85rem' }}>Todo al día</span>
               </div>
-            ))}
-            {pendingChores.length === 0 && <p className="text-muted text-sm" style={{ textAlign: 'center', padding: '1rem' }}>Todo al día ✓</p>}
-            <Link to="/chores" className="btn-ghost" style={{ justifyContent: 'center', marginTop: '0.25rem' }}>Gestionar tareas</Link>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+                {pendingChores.slice(0, 5).map(c => (
+                  <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.75rem', background: 'var(--p-background)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+                    <span style={{ fontWeight: '600', fontSize: '0.85rem' }}>{c.name}</span>
+                    <span className="badge badge-blue" style={{ fontSize: '0.65rem' }}>{c.user}</span>
+                  </div>
+                ))}
+                {pendingChores.length > 5 && (
+                  <p style={{ fontSize: '0.75rem', color: 'var(--p-text-muted)', textAlign: 'center', padding: '0.25rem' }}>+{pendingChores.length - 5} más</p>
+                )}
+              </div>
+            )}
           </div>
-        </div>
 
+        </div>
       </div>
     </div>
   );
@@ -214,6 +320,7 @@ const App = () => {
           <Route path="chores" element={<Chores />} />
           <Route path="routines" element={<Routines />} />
           <Route path="rewards" element={<Rewards />} />
+          <Route path="prep" element={<PrepView />} />
           <Route path="duel" element={<KidDuel />} />
           <Route path="settings" element={<Settings />} />
           <Route path="calendar" element={<CalendarPage />} />

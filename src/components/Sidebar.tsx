@@ -1,12 +1,13 @@
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Utensils, ShoppingCart, GraduationCap,
-  CheckSquare, Trophy, Calendar, Settings, LogOut, Clock, Eye, EyeOff, Home,
+  CheckSquare, Trophy, Calendar, Settings, LogOut, Clock, Eye, EyeOff, Home, ChefHat,
 } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 
 const navItems = [
   { to: '/',         icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/prep',     icon: ChefHat,         label: 'Preparación' },
   { to: '/menu',     icon: Utensils,        label: 'Menú Semanal' },
   { to: '/shopping', icon: ShoppingCart,    label: 'Lista de Súper' },
   { to: '/school',   icon: GraduationCap,  label: 'Módulo Escolar' },

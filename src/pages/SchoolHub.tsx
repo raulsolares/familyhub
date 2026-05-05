@@ -56,8 +56,14 @@ const SchoolHub = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const data = { child, title, desc, eventDate, deadline: deadline || eventDate, category };
-    editingTask ? updateSchoolTask(editingTask.id, data) : addSchoolTask(data);
+    const base = { title, desc, eventDate, deadline: deadline || eventDate, category };
+    if (editingTask) {
+      updateSchoolTask(editingTask.id, { ...base, child });
+    } else if (child === '__todos__') {
+      children.forEach(c => addSchoolTask({ ...base, child: c.name }));
+    } else {
+      addSchoolTask({ ...base, child });
+    }
     reset();
   };
 
@@ -134,8 +140,9 @@ const SchoolHub = () => {
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div className="form-group">
                 <label className="form-label">Niño/a</label>
-                <select value={child} onChange={e => setChild(e.target.value)}>
-                  {children.map(c => <option key={c.id}>{c.name}</option>)}
+                <select value={child} onChange={e => setChild(e.target.value)} disabled={!!editingTask}>
+                  {!editingTask && <option value="__todos__">Ambos niños</option>}
+                  {children.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                 </select>
               </div>
               <div className="form-group">
