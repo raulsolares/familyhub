@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useData } from '../context/DataContext';
-import { X, CheckCircle2, User, Plus, Minus } from 'lucide-react';
+import { X, CheckCircle2, User, Plus, Minus, RefreshCw } from 'lucide-react';
 
 const WeeklyMenu = () => {
-  const { weeklyMenu, foods, assignMeal, toggleAte } = useData();
+  const { weeklyMenu, foods, assignMeal, toggleAte, clearWeeklyMenu } = useData();
+  const [confirmNewWeek, setConfirmNewWeek] = useState(false);
 
   const days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
   const meals = ['Desayuno', 'Snack', 'Lunch', 'Comida', 'Merienda', 'Cena'];
@@ -74,10 +75,43 @@ const WeeklyMenu = () => {
 
   return (
     <div>
-      <header className="page-header">
-        <h1 className="page-title">Planificación Alimenticia</h1>
-        <p className="page-subtitle">Menú personalizado para cada miembro de la familia</p>
+      <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <h1 className="page-title">Planificación Alimenticia</h1>
+          <p className="page-subtitle">Menú personalizado para cada miembro de la familia</p>
+        </div>
+        {weeklyMenu.length > 0 && (
+          <button
+            onClick={() => setConfirmNewWeek(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 0.875rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--p-background)', color: 'var(--p-text-muted)', fontWeight: '700', fontSize: '0.8rem', cursor: 'pointer' }}
+          >
+            <RefreshCw size={14} /> Nueva semana
+          </button>
+        )}
       </header>
+
+      {confirmNewWeek && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
+          <div className="card" style={{ maxWidth: '380px', width: '100%', textAlign: 'center' }}>
+            <RefreshCw size={32} color="var(--p-primary)" style={{ margin: '0 auto 1rem' }} />
+            <h3 style={{ fontWeight: '800', fontSize: '1.1rem', marginBottom: '0.5rem' }}>¿Empezar nueva semana?</h3>
+            <p style={{ fontSize: '0.85rem', color: 'var(--p-text-muted)', marginBottom: '1.5rem' }}>
+              Se borrará todo el menú planificado. El catálogo de alimentos se mantiene intacto.
+            </p>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button onClick={() => setConfirmNewWeek(false)} style={{ flex: 1, padding: '0.75rem', background: 'var(--p-background)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontWeight: '700', cursor: 'pointer' }}>
+                Cancelar
+              </button>
+              <button
+                onClick={() => { clearWeeklyMenu(); setConfirmNewWeek(false); }}
+                style={{ flex: 1, padding: '0.75rem', background: 'var(--p-primary)', border: 'none', borderRadius: 'var(--radius)', color: 'white', fontWeight: '800', cursor: 'pointer' }}
+              >
+                Sí, nueva semana
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Vista HOY */}
       <div className="card" style={{ marginBottom: '2rem', border: '2px solid var(--p-primary)' }}>

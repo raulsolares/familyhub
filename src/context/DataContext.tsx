@@ -194,6 +194,7 @@ interface DataContextType {
 
   assignMeal: (day: string, meal: string, foodIds: string[], member: string, quantities?: { [fid: string]: number }) => void;
   toggleAte: (id: string) => void;
+  clearWeeklyMenu: () => void;
 
   addSchoolTask: (task: Omit<SchoolTask, 'id' | 'completed'>) => void;
   updateSchoolTask: (id: string, task: Partial<SchoolTask>) => void;
@@ -407,6 +408,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   };
   const toggleAte = (id: string) =>
     setWeeklyMenu(weeklyMenu.map(x => (x.id === id ? { ...x, ate: !x.ate } : x)));
+  const clearWeeklyMenu = () => setWeeklyMenu([]);
 
   const addSchoolTask = (t: Omit<SchoolTask, 'id' | 'completed'>) =>
     setSchoolTasks(prev => [...prev, { ...t, id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, completed: false }]);
@@ -455,7 +457,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       addPointLog, deletePointLog,
       updateMember,
       addRoutine, updateRoutine, deleteRoutine, toggleRoutineTask,
-      assignMeal, toggleAte,
+      assignMeal, toggleAte, clearWeeklyMenu,
       addSchoolTask, updateSchoolTask, deleteSchoolTask, toggleSchoolTask,
       updateSchoolCategories,
       addPrize, updatePrize, deletePrize,
