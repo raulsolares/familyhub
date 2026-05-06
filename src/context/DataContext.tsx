@@ -138,6 +138,13 @@ export interface CustomShoppingItem {
   createdAt: string;
 }
 
+export interface ExtraItem {
+  id: string;
+  name: string;
+  unit: string;
+  category: string;
+}
+
 // ── Context type ─────────────────────────────────────────────────────────────
 
 interface DataContextType {
@@ -216,6 +223,11 @@ interface DataContextType {
   toggleCustomShoppingItem: (id: string) => void;
   deleteCustomShoppingItem: (id: string) => void;
   clearCustomShoppingItems: () => void;
+
+  extraItems: ExtraItem[];
+  addExtraItem: (item: Omit<ExtraItem, 'id'>) => void;
+  updateExtraItem: (id: string, item: Partial<ExtraItem>) => void;
+  deleteExtraItem: (id: string) => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -250,6 +262,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [prizes, setPrizes] = useState<Prize[]>([]);
   const [prizeRequests, setPrizeRequests] = useState<PrizeRequest[]>([]);
   const [customShoppingItems, setCustomShoppingItems] = useState<CustomShoppingItem[]>([]);
+  const [extraItems, setExtraItems] = useState<ExtraItem[]>([]);
 
   // ── Firebase sync ──────────────────────────────────────────────────────────
 
@@ -286,6 +299,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         if (data.prizes) setPrizes(data.prizes);
         if (data.prizeRequests) setPrizeRequests(data.prizeRequests);
         if (data.customShoppingItems) setCustomShoppingItems(data.customShoppingItems);
+        if (data.extraItems) setExtraItems(data.extraItems);
       }
       setIsCloudLoaded(true);
     });
@@ -301,14 +315,14 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       const payload = sanitize({
         members, foods, weeklyMenu, chores, schoolTasks, pointLogs, rules,
         routines, products, shoppingNotes, routineLogs, ingredientItems,
-        schoolCategories, prizes, prizeRequests, customShoppingItems,
+        schoolCategories, prizes, prizeRequests, customShoppingItems, extraItems,
       });
       setDoc(doc(db, 'familyhub', 'main_state'), payload, { merge: true }).catch(console.error);
     }
   }, [
     members, foods, weeklyMenu, chores, schoolTasks, pointLogs, rules,
     routines, products, shoppingNotes, routineLogs, ingredientItems,
-    schoolCategories, prizes, prizeRequests, customShoppingItems, isCloudLoaded,
+    schoolCategories, prizes, prizeRequests, customShoppingItems, extraItems, isCloudLoaded,
   ]);
 
   // ── Computed ───────────────────────────────────────────────────────────────
@@ -442,6 +456,13 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     setCustomShoppingItems(prev => prev.filter(x => x.id !== id));
   const clearCustomShoppingItems = () => setCustomShoppingItems([]);
 
+  const addExtraItem = (item: Omit<ExtraItem, 'id'>) =>
+    setExtraItems(prev => [...prev, { ...item, id: `${Date.now()}-${Math.random().toString(36).slice(2)}` }]);
+  const updateExtraItem = (id: string, item: Partial<ExtraItem>) =>
+    setExtraItems(prev => prev.map(x => x.id === id ? { ...x, ...item } : x));
+  const deleteExtraItem = (id: string) =>
+    setExtraItems(prev => prev.filter(x => x.id !== id));
+
   return (
     <DataContext.Provider value={{
       foods, chores, schoolTasks, weeklyMenu, pointLogs, rules, members, routines,
@@ -464,6 +485,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       addPrizeRequest, updatePrizeRequest, deletePrizeRequest,
       customShoppingItems,
       addCustomShoppingItem, toggleCustomShoppingItem, deleteCustomShoppingItem, clearCustomShoppingItems,
+      extraItems, addExtraItem, updateExtraItem, deleteExtraItem,
     }}>
       {children}
     </DataContext.Provider>
