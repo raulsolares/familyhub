@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CheckCircle2, Circle, ArrowLeft, MessageSquare, Package, Tag } from 'lucide-react';
+import { CheckCircle2, Circle, ArrowLeft, MessageSquare, Package, Tag, DollarSign, Check } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useData } from '../context/DataContext';
 import type { Food, Product } from '../context/DataContext';
@@ -13,14 +13,21 @@ interface ShoppingItem {
   category: string;
   source: 'menu' | 'extra';
   bought: boolean;
+  customId?: string; // id en customShoppingItems para extras
 }
 
 const ShoppingMode = () => {
-  const { weeklyMenu, foods, products, shoppingNotes, customShoppingItems } = useData();
+  const {
+    weeklyMenu, foods, products, addProduct, updateProduct,
+    shoppingNotes, customShoppingItems, updateCustomShoppingItem,
+    extraItems, addExtraItem, updateExtraItem,
+  } = useData();
+
   const [items, setItems] = useState<ShoppingItem[]>([]);
+  const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
+  const [tempPrice, setTempPrice] = useState<string>('');
 
   useEffect(() => {
-    // 1. Ingredientes del menú (agregados)
     const agg = new Map<string, { name: string; qty: number; unit: string }>();
     weeklyMenu.forEach(slot => {
       slot.foodIds.forEach(fid => {
@@ -49,41 +56,72 @@ const ShoppingMode = () => {
       };
     });
 
-    // 2. Extras no comprados de la semana
-    const extraItems: ShoppingItem[] = customShoppingItems
+    const extraList: ShoppingItem[] = customShoppingItems
       .filter(i => !i.checked)
-      .map(i => ({
-        id: `extra_${i.id}`,
-        name: i.name,
-        qty: i.qty,
-        unit: i.unit,
-        price: 0,
-        category: 'Extras',
-        source: 'extra' as const,
-        bought: false,
-      }));
+      .map(i => {
+        // Buscar precio en catálogo de extras si el item no tiene precio propio
+        const catalogItem = extraItems.find(ei => ei.name.toLowerCase() === i.name.toLowerCase());
+        const price = i.price ?? catalogItem?.price ?? 0;
+        return {
+          id: `extra_${i.id}`,
+          name: i.name,
+          qty: i.qty,
+          unit: i.unit,
+          price,
+          category: 'Extras',
+          source: 'extra' as const,
+          bought: false,
+          customId: i.id,
+        };
+      });
 
-    setItems([...menuItems, ...extraItems]);
-  }, [weeklyMenu, foods, products, customShoppingItems]);
+    setItems([...menuItems, ...extraList]);
+  }, [weeklyMenu, foods, products, customShoppingItems, extraItems]);
 
   const toggleItem = (id: string) =>
     setItems(prev => prev.map(item => item.id === id ? { ...item, bought: !item.bought } : item));
 
-  const boughtCount = items.filter(i => i.bought).length;
-  const totalPrice = items.filter(i => i.bought).reduce((acc, i) => acc + i.price, 0);
+  const savePrice = (item: ShoppingItem) => {
+    const price = parseFloat(tempPrice);
+    if (isNaN(price) || price < 0) { setEditingPriceId(null); return; }
 
-  const menuCount = items.filter(i => i.source === 'menu').length;
-  const extraCount = items.filter(i => i.source === 'extra').length;
+    // Actualizar en items locales
+    setItems(prev => prev.map(i => i.id === item.id ? { ...i, price } : i));
+
+    if (item.source === 'menu') {
+      // Guardar/actualizar en catálogo de productos
+      const existing = products.find((p: Product) => p.name.toLowerCase() === item.name.toLowerCase());
+      if (existing) {
+        updateProduct(existing.id, { price, defaultQty: item.qty });
+      } else {
+        addProduct({ name: item.name, price, defaultQty: item.qty, unit: item.unit, category: 'Ingredientes' });
+      }
+    } else {
+      // Guardar en catálogo de extras y en el item de la lista
+      if (item.customId) updateCustomShoppingItem(item.customId, { price });
+      const existingExtra = extraItems.find(ei => ei.name.toLowerCase() === item.name.toLowerCase());
+      if (existingExtra) {
+        updateExtraItem(existingExtra.id, { price });
+      } else {
+        addExtraItem({ name: item.name, unit: item.unit, category: 'Otros', price });
+      }
+    }
+    setEditingPriceId(null);
+  };
+
+  const boughtCount = items.filter(i => i.bought).length;
+  const totalAll = items.reduce((acc, i) => acc + i.price * i.qty, 0);
+  const totalBought = items.filter(i => i.bought).reduce((acc, i) => acc + i.price * i.qty, 0);
+  const pendingItems = items.filter(i => !i.bought);
+  const boughtItems = items.filter(i => i.bought);
 
   return (
-    <div style={{ maxWidth: '600px', margin: '0 auto', paddingBottom: '120px' }}>
+    <div style={{ maxWidth: '600px', margin: '0 auto', paddingBottom: '130px' }}>
       <header style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', background: 'var(--p-surface)', padding: '1rem', borderRadius: '16px', boxShadow: 'var(--shadow-premium)' }}>
         <Link to="/shopping" style={{ color: 'var(--p-text)' }}><ArrowLeft /></Link>
         <div style={{ flex: 1 }}>
           <h1 style={{ fontSize: '1.5rem', fontWeight: '900' }}>🛒 En el Súper</h1>
-          <p style={{ fontSize: '0.875rem', color: 'var(--p-text-muted)' }}>
-            {menuCount > 0 && `${menuCount} ingredientes`}{menuCount > 0 && extraCount > 0 && ' · '}{extraCount > 0 && `${extraCount} extras`}
-          </p>
+          <p style={{ fontSize: '0.875rem', color: 'var(--p-text-muted)' }}>{items.length} artículos · est. ${totalAll.toFixed(0)}</p>
         </div>
         <div style={{ textAlign: 'right' }}>
           <p style={{ fontSize: '0.75rem', color: 'var(--p-text-muted)', fontWeight: '600' }}>{boughtCount}/{items.length}</p>
@@ -93,7 +131,6 @@ const ShoppingMode = () => {
         </div>
       </header>
 
-      {/* Notas */}
       {shoppingNotes.length > 0 && (
         <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '16px', padding: '1rem', marginBottom: '1.5rem' }}>
           <h3 style={{ fontSize: '0.9rem', color: '#b45309', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', fontWeight: '800' }}>
@@ -112,72 +149,67 @@ const ShoppingMode = () => {
           <p style={{ fontSize: '0.875rem' }}>Planifica el menú o agrega extras para ver la lista</p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gap: '0.625rem' }}>
-          {/* Pendientes */}
-          {items.filter(i => !i.bought).map(item => (
-            <div
-              key={item.id}
-              onClick={() => toggleItem(item.id)}
-              style={{
-                padding: '1rem 1.25rem',
-                background: 'var(--p-surface)',
-                borderRadius: '14px',
-                border: '1px solid var(--border)',
-                boxShadow: 'var(--shadow-sm)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '1rem',
-                cursor: 'pointer',
-                transition: 'all 0.15s',
-              }}
-            >
-              <Circle color="var(--p-text-muted)" size={26} />
-              <div style={{ flex: 1 }}>
-                <p style={{ fontWeight: '800', fontSize: '1rem', color: 'var(--p-text)' }}>{item.name}</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.2rem' }}>
-                  <span style={{ fontSize: '0.7rem', background: item.source === 'menu' ? '#eef2ff' : '#f0fdf4', color: item.source === 'menu' ? 'var(--p-primary)' : 'var(--success)', padding: '0.1rem 0.5rem', borderRadius: '4px', fontWeight: '800' }}>
-                    {item.source === 'menu' ? 'MENÚ' : 'EXTRA'}
-                  </span>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--p-text-muted)', fontWeight: '700' }}>{item.qty % 1 === 0 ? item.qty : item.qty.toFixed(1)} {item.unit}</p>
+        <div style={{ display: 'grid', gap: '0.5rem' }}>
+          {pendingItems.map(item => (
+            <div key={item.id} style={{ background: 'var(--p-surface)', borderRadius: '14px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)', overflow: 'hidden' }}>
+              <div
+                onClick={() => { if (editingPriceId !== item.id) toggleItem(item.id); }}
+                style={{ padding: '0.875rem 1rem', display: 'flex', alignItems: 'center', gap: '0.875rem', cursor: 'pointer' }}
+              >
+                <Circle color="var(--p-text-muted)" size={24} />
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontWeight: '800', fontSize: '0.95rem' }}>{item.name}</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.125rem' }}>
+                    <span style={{ fontSize: '0.7rem', background: item.source === 'menu' ? '#eef2ff' : '#f0fdf4', color: item.source === 'menu' ? 'var(--p-primary)' : 'var(--success)', padding: '1px 5px', borderRadius: '4px', fontWeight: '800' }}>
+                      {item.source === 'menu' ? 'MENÚ' : 'EXTRA'}
+                    </span>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--p-text-muted)', fontWeight: '600' }}>{item.qty % 1 === 0 ? item.qty : item.qty.toFixed(1)} {item.unit}</span>
+                  </div>
                 </div>
+
+                {editingPriceId === item.id ? (
+                  <div onClick={e => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: '700' }}>$</span>
+                    <input
+                      autoFocus
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={tempPrice}
+                      onChange={e => setTempPrice(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') savePrice(item); if (e.key === 'Escape') setEditingPriceId(null); }}
+                      style={{ width: '70px', padding: '0.25rem 0.5rem', borderRadius: '6px', border: '1px solid var(--p-primary)', fontSize: '0.875rem', fontWeight: '700' }}
+                    />
+                    <button onClick={() => savePrice(item)} style={{ padding: '4px 8px', background: 'var(--p-primary)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem' }}>
+                      <Check size={13} />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={e => { e.stopPropagation(); setEditingPriceId(item.id); setTempPrice(item.price > 0 ? item.price.toFixed(2) : ''); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '4px 8px', background: item.price > 0 ? 'var(--p-primary-50)' : 'var(--p-background)', border: `1px solid ${item.price > 0 ? 'var(--p-primary)' : 'var(--border)'}`, borderRadius: '8px', cursor: 'pointer', color: item.price > 0 ? 'var(--p-primary)' : 'var(--p-text-muted)', fontWeight: '800', fontSize: '0.8rem' }}
+                  >
+                    <DollarSign size={11} />
+                    {item.price > 0 ? item.price.toFixed(0) : '—'}
+                  </button>
+                )}
               </div>
-              {item.price > 0 && (
-                <div style={{ fontWeight: '900', color: 'var(--p-primary)', fontSize: '0.9rem' }}>
-                  ${item.price.toFixed(0)}
-                </div>
-              )}
             </div>
           ))}
 
-          {/* Comprados */}
-          {items.filter(i => i.bought).length > 0 && (
+          {boughtItems.length > 0 && (
             <>
-              <p style={{ fontSize: '0.72rem', fontWeight: '700', color: 'var(--p-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '0.25rem 0' }}>
-                <Tag size={11} style={{ verticalAlign: 'middle', marginRight: 4 }} />
-                Comprados ({items.filter(i => i.bought).length})
+              <p style={{ fontSize: '0.72rem', fontWeight: '700', color: 'var(--p-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '0.25rem 0', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                <Tag size={11} /> Comprados ({boughtItems.length})
               </p>
-              {items.filter(i => i.bought).map(item => (
-                <div
-                  key={item.id}
-                  onClick={() => toggleItem(item.id)}
-                  style={{
-                    padding: '0.875rem 1.25rem',
-                    background: '#f0fdf4',
-                    borderRadius: '14px',
-                    border: '2px solid #86efac',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '1rem',
-                    cursor: 'pointer',
-                    opacity: 0.75,
-                  }}
-                >
-                  <CheckCircle2 color="#22c55e" size={26} />
+              {boughtItems.map(item => (
+                <div key={item.id} onClick={() => toggleItem(item.id)} style={{ padding: '0.75rem 1rem', background: '#f0fdf4', borderRadius: '14px', border: '2px solid #86efac', display: 'flex', alignItems: 'center', gap: '0.875rem', cursor: 'pointer', opacity: 0.75 }}>
+                  <CheckCircle2 color="#22c55e" size={24} />
                   <div style={{ flex: 1 }}>
-                    <p style={{ fontWeight: '700', fontSize: '0.95rem', textDecoration: 'line-through', color: '#166534' }}>{item.name}</p>
-                    <p style={{ fontSize: '0.8rem', color: '#15803d', fontWeight: '600' }}>{item.qty % 1 === 0 ? item.qty : item.qty.toFixed(1)} {item.unit}</p>
+                    <p style={{ fontWeight: '700', fontSize: '0.9rem', textDecoration: 'line-through', color: '#166534' }}>{item.name}</p>
+                    <p style={{ fontSize: '0.78rem', color: '#15803d', fontWeight: '600' }}>{item.qty % 1 === 0 ? item.qty : item.qty.toFixed(1)} {item.unit}</p>
                   </div>
-                  {item.price > 0 && <span style={{ fontWeight: '800', color: '#15803d' }}>${item.price.toFixed(0)}</span>}
+                  {item.price > 0 && <span style={{ fontWeight: '800', color: '#15803d', fontSize: '0.875rem' }}>${item.price.toFixed(0)}</span>}
                 </div>
               ))}
             </>
@@ -186,28 +218,11 @@ const ShoppingMode = () => {
       )}
 
       {/* Footer fijo */}
-      <div style={{
-        position: 'fixed',
-        bottom: '20px',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        width: '90%',
-        maxWidth: '500px',
-        background: 'var(--p-primary)',
-        color: 'white',
-        padding: '1.125rem 1.5rem',
-        borderRadius: '20px',
-        boxShadow: '0 10px 25px rgba(79, 70, 229, 0.4)',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-      }}>
+      <div style={{ position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)', width: '90%', maxWidth: '500px', background: 'var(--p-primary)', color: 'white', padding: '1rem 1.5rem', borderRadius: '20px', boxShadow: '0 10px 25px rgba(79, 70, 229, 0.4)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <p style={{ fontSize: '0.75rem', opacity: 0.9, fontWeight: '600' }}>
-            {boughtCount} de {items.length} artículos
-          </p>
+          <p style={{ fontSize: '0.75rem', opacity: 0.9, fontWeight: '600' }}>{boughtCount} de {items.length} artículos</p>
           <p style={{ fontSize: '1.25rem', fontWeight: '900' }}>
-            {totalPrice > 0 ? `$${totalPrice.toFixed(2)}` : '—'}
+            {totalBought > 0 ? `$${totalBought.toFixed(2)}` : totalAll > 0 ? `est. $${totalAll.toFixed(2)}` : '—'}
           </p>
         </div>
         <Link to="/shopping" style={{ textDecoration: 'none' }}>

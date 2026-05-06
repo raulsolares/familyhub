@@ -46,11 +46,13 @@ const ShoppingList = () => {
   const [eName, setEName] = useState('');
   const [eUnit, setEUnit] = useState('pzas');
   const [eCategory, setECategory] = useState('Limpieza');
+  const [ePrice, setEPrice] = useState<number | ''>('');
 
   // Add extra to list
   const [extraListName, setExtraListName] = useState('');
   const [extraListQty, setExtraListQty] = useState<number>(1);
   const [extraListUnit, setExtraListUnit] = useState('pzas');
+  const [extraListPrice, setExtraListPrice] = useState<number | ''>('');
 
   // Notes
   const [noteText, setNoteText] = useState('');
@@ -98,17 +100,23 @@ const ShoppingList = () => {
   const handleExtraFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!eName.trim()) return;
-    editingExtra
-      ? updateExtraItem(editingExtra.id, { name: eName.trim(), unit: eUnit, category: eCategory })
-      : addExtraItem({ name: eName.trim(), unit: eUnit, category: eCategory });
-    setEName(''); setEUnit('pzas'); setECategory('Limpieza'); setEditingExtra(null); setShowExtraForm(false);
+    const payload = { name: eName.trim(), unit: eUnit, category: eCategory, price: ePrice ? Number(ePrice) : undefined };
+    editingExtra ? updateExtraItem(editingExtra.id, payload) : addExtraItem(payload);
+    setEName(''); setEUnit('pzas'); setECategory('Limpieza'); setEPrice(''); setEditingExtra(null); setShowExtraForm(false);
   };
 
   const handleAddToList = (e: React.FormEvent) => {
     e.preventDefault();
     if (!extraListName.trim()) return;
-    addCustomShoppingItem({ name: extraListName.trim(), qty: extraListQty, unit: extraListUnit });
-    setExtraListName(''); setExtraListQty(1); setExtraListUnit('pzas');
+    addCustomShoppingItem({ name: extraListName.trim(), qty: extraListQty, unit: extraListUnit, price: extraListPrice ? Number(extraListPrice) : undefined });
+    // Si tiene precio, guardar en catálogo de extras si no existe
+    if (extraListPrice && !extraItems.some(ei => ei.name.toLowerCase() === extraListName.trim().toLowerCase())) {
+      addExtraItem({ name: extraListName.trim(), unit: extraListUnit, category: 'Otros', price: Number(extraListPrice) });
+    } else if (extraListPrice) {
+      const existing = extraItems.find(ei => ei.name.toLowerCase() === extraListName.trim().toLowerCase());
+      if (existing) updateExtraItem(existing.id, { price: Number(extraListPrice) });
+    }
+    setExtraListName(''); setExtraListQty(1); setExtraListUnit('pzas'); setExtraListPrice('');
   };
 
   const addFromCatalog = (item: ExtraItem) => {
@@ -241,6 +249,7 @@ const ShoppingList = () => {
                     <button onClick={() => toggleCustomShoppingItem(item.id)} style={{ width: '22px', height: '22px', borderRadius: '50%', border: '2px solid var(--border)', background: 'none', cursor: 'pointer', flexShrink: 0 }} />
                     <span style={{ fontWeight: '700', fontSize: '0.875rem', flex: 1 }}>{item.name}</span>
                     <span style={{ fontWeight: '600', fontSize: '0.8rem', color: 'var(--p-text-muted)' }}>{item.qty} {item.unit}</span>
+                    {item.price && <span style={{ fontWeight: '700', fontSize: '0.8rem', color: 'var(--p-primary)' }}>${item.price.toFixed(2)}</span>}
                     {confirmDeleteId === item.id ? (
                       <div style={{ display: 'flex', gap: '0.375rem', alignItems: 'center', flexShrink: 0 }}>
                         <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#ef4444' }}>¿Seguro?</span>
@@ -295,12 +304,18 @@ const ShoppingList = () => {
                 <Plus size={14} color="var(--p-primary)" /> Agregar artículo
               </h3>
               <form onSubmit={handleAddToList} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <input required value={extraListName} onChange={e => setExtraListName(e.target.value)} placeholder="Ej: Papel de baño" style={{ padding: '0.625rem 0.75rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)', fontSize: '0.875rem' }} />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                  <input type="number" min="1" value={extraListQty} onChange={e => setExtraListQty(Number(e.target.value))} style={{ padding: '0.5rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)', fontSize: '0.875rem' }} />
+                <input required value={extraListName} onChange={e => {
+                  setExtraListName(e.target.value);
+                  // Auto-completar precio y unidad del catálogo
+                  const found = extraItems.find(ei => ei.name.toLowerCase() === e.target.value.trim().toLowerCase());
+                  if (found) { if (found.price) setExtraListPrice(found.price); setExtraListUnit(found.unit); }
+                }} placeholder="Ej: Papel de baño" style={{ padding: '0.625rem 0.75rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)', fontSize: '0.875rem' }} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
+                  <input type="number" min="1" value={extraListQty} onChange={e => setExtraListQty(Number(e.target.value))} placeholder="Cant." style={{ padding: '0.5rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)', fontSize: '0.875rem' }} />
                   <select value={extraListUnit} onChange={e => setExtraListUnit(e.target.value)} style={{ padding: '0.5rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)', fontSize: '0.875rem' }}>
                     {UNITS.map(u => <option key={u}>{u}</option>)}
                   </select>
+                  <input type="number" min="0" step="0.01" value={extraListPrice} onChange={e => setExtraListPrice(e.target.value === '' ? '' : Number(e.target.value))} placeholder="$Precio" style={{ padding: '0.5rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)', fontSize: '0.875rem' }} />
                 </div>
                 <button type="submit" className="btn-primary" style={{ justifyContent: 'center', padding: '0.625rem' }}>
                   <Plus size={15} /> Agregar a la lista
@@ -413,13 +428,14 @@ const ShoppingList = () => {
               </div>
 
               {showExtraForm && (
-                <form onSubmit={handleExtraFormSubmit} style={{ background: 'var(--p-background)', padding: '1.25rem', borderRadius: 'var(--radius)', marginBottom: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.875rem', alignItems: 'end', border: '1px solid var(--border)' }}>
+                <form onSubmit={handleExtraFormSubmit} style={{ background: 'var(--p-background)', padding: '1.25rem', borderRadius: 'var(--radius)', marginBottom: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.875rem', alignItems: 'end', border: '1px solid var(--border)' }}>
                   <div className="form-group"><label className="form-label">Nombre</label><input required value={eName} onChange={e => setEName(e.target.value)} placeholder="Ej: Jabón de trastes" /></div>
                   <div className="form-group"><label className="form-label">Unidad</label><select value={eUnit} onChange={e => setEUnit(e.target.value)}>{UNITS.map(u => <option key={u}>{u}</option>)}</select></div>
                   <div className="form-group"><label className="form-label">Categoría</label><select value={eCategory} onChange={e => setECategory(e.target.value)}>{EXTRA_CATS.map(c => <option key={c}>{c}</option>)}</select></div>
+                  <div className="form-group"><label className="form-label">Precio ($)</label><input type="number" min="0" step="0.01" value={ePrice} onChange={e => setEPrice(e.target.value === '' ? '' : Number(e.target.value))} placeholder="0.00" /></div>
                   <div style={{ display: 'flex', gap: '0.375rem' }}>
                     <button type="submit" className="btn-primary" style={{ justifyContent: 'center', flex: 1 }}><Save size={15} /></button>
-                    <button type="button" className="btn-ghost" onClick={() => { setShowExtraForm(false); setEditingExtra(null); }}><X size={15} /></button>
+                    <button type="button" className="btn-ghost" onClick={() => { setShowExtraForm(false); setEditingExtra(null); setEPrice(''); }}><X size={15} /></button>
                   </div>
                 </form>
               )}
@@ -433,8 +449,9 @@ const ShoppingList = () => {
                   extraItems.map(item => (
                     <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.625rem 0.875rem', background: 'var(--p-background)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
                       <span style={{ fontWeight: '700', fontSize: '0.875rem', flex: 1 }}>{item.name} <span style={{ fontWeight: '500', color: 'var(--p-text-muted)', fontSize: '0.75rem' }}>({item.unit})</span></span>
+                      {item.price && <span style={{ fontWeight: '800', color: 'var(--p-primary)', fontSize: '0.875rem' }}>${item.price.toFixed(2)}</span>}
                       <span className="badge badge-blue" style={{ fontSize: '0.65rem' }}>{item.category}</span>
-                      <button onClick={() => { setEditingExtra(item); setEName(item.name); setEUnit(item.unit); setECategory(item.category); setShowExtraForm(true); }} className="btn-icon"><Edit2 size={13} /></button>
+                      <button onClick={() => { setEditingExtra(item); setEName(item.name); setEUnit(item.unit); setECategory(item.category); setEPrice(item.price ?? ''); setShowExtraForm(true); }} className="btn-icon"><Edit2 size={13} /></button>
                       <button onClick={() => deleteExtraItem(item.id)} className="btn-icon" style={{ color: 'var(--danger)' }}><Trash2 size={13} /></button>
                     </div>
                   ))

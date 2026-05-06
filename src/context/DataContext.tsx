@@ -81,6 +81,7 @@ export interface SchoolTask {
   title: string;
   desc: string;
   eventDate: string;
+  eventTime?: string;
   deadline: string;
   category: string;
   completed: boolean;
@@ -134,6 +135,7 @@ export interface CustomShoppingItem {
   name: string;
   qty: number;
   unit: string;
+  price?: number;
   checked: boolean;
   createdAt: string;
 }
@@ -143,6 +145,7 @@ export interface ExtraItem {
   name: string;
   unit: string;
   category: string;
+  price?: number;
 }
 
 // ── Context type ─────────────────────────────────────────────────────────────
@@ -220,6 +223,7 @@ interface DataContextType {
 
   customShoppingItems: CustomShoppingItem[];
   addCustomShoppingItem: (item: Omit<CustomShoppingItem, 'id' | 'checked' | 'createdAt'>) => void;
+  updateCustomShoppingItem: (id: string, item: Partial<CustomShoppingItem>) => void;
   toggleCustomShoppingItem: (id: string) => void;
   deleteCustomShoppingItem: (id: string) => void;
   clearCustomShoppingItems: () => void;
@@ -450,6 +454,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const addCustomShoppingItem = (item: Omit<CustomShoppingItem, 'id' | 'checked' | 'createdAt'>) =>
     setCustomShoppingItems(prev => [...prev, { ...item, id: Date.now().toString(), checked: false, createdAt: new Date().toISOString() }]);
+  const updateCustomShoppingItem = (id: string, item: Partial<CustomShoppingItem>) =>
+    setCustomShoppingItems(prev => prev.map(x => x.id === id ? { ...x, ...item } : x));
   const toggleCustomShoppingItem = (id: string) =>
     setCustomShoppingItems(prev => prev.map(x => x.id === id ? { ...x, checked: !x.checked } : x));
   const deleteCustomShoppingItem = (id: string) =>
@@ -484,7 +490,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       addPrize, updatePrize, deletePrize,
       addPrizeRequest, updatePrizeRequest, deletePrizeRequest,
       customShoppingItems,
-      addCustomShoppingItem, toggleCustomShoppingItem, deleteCustomShoppingItem, clearCustomShoppingItems,
+      addCustomShoppingItem, updateCustomShoppingItem, toggleCustomShoppingItem, deleteCustomShoppingItem, clearCustomShoppingItems,
       extraItems, addExtraItem, updateExtraItem, deleteExtraItem,
     }}>
       {children}

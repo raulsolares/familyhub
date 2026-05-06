@@ -45,18 +45,22 @@ const SchoolHub = () => {
   const [title, setTitle] = useState('');
   const [desc, setDesc] = useState('');
   const [eventDate, setEventDate] = useState('');
+  const [eventTime, setEventTime] = useState('');
   const [deadline, setDeadline] = useState('');
   const [category, setCategory] = useState(schoolCategories[0] || 'Otro');
 
+  const fmtDate = (d: string) => d ? new Date(d + 'T12:00').toLocaleDateString('es-MX') : '—';
+
   const reset = () => {
     setChild(defaultChild); setTitle(''); setDesc('');
-    setEventDate(''); setDeadline(''); setCategory(schoolCategories[0] || 'Otro');
+    setEventDate(''); setEventTime(''); setDeadline('');
+    setCategory(schoolCategories[0] || 'Otro');
     setEditingTask(null); setShowForm(false);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const base = { title, desc, eventDate, deadline: deadline || eventDate, category };
+    const base = { title, desc, eventDate, eventTime: eventTime || undefined, deadline: deadline || eventDate, category };
     if (editingTask) {
       updateSchoolTask(editingTask.id, { ...base, child });
     } else if (child === '__todos__') {
@@ -70,7 +74,8 @@ const SchoolHub = () => {
   const handleEdit = (task: SchoolTask) => {
     setEditingTask(task);
     setChild(task.child); setTitle(task.title); setDesc(task.desc);
-    setEventDate(task.eventDate || ''); setDeadline(task.deadline || '');
+    setEventDate(task.eventDate || ''); setEventTime(task.eventTime || '');
+    setDeadline(task.deadline || '');
     setCategory(task.category || schoolCategories[0]);
     setShowForm(true);
   };
@@ -165,12 +170,16 @@ const SchoolHub = () => {
                   <input required type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Fecha límite de entrega</label>
-                  <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} />
-                  <p style={{ fontSize: '0.7rem', color: 'var(--p-text-muted)', marginTop: '0.25rem' }}>
-                    Si vacío, igual a fecha del evento
-                  </p>
+                  <label className="form-label">Hora {category === 'Evento' ? '*' : '(opcional)'}</label>
+                  <input type="time" value={eventTime} onChange={e => setEventTime(e.target.value)} />
                 </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Fecha límite de entrega</label>
+                <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} />
+                <p style={{ fontSize: '0.7rem', color: 'var(--p-text-muted)', marginTop: '0.25rem' }}>
+                  Si vacío, igual a fecha del evento
+                </p>
               </div>
               <button type="submit" className="btn-primary" style={{ marginTop: '0.5rem', justifyContent: 'center' }}>
                 {editingTask ? 'Guardar cambios' : 'Crear pendiente'}
@@ -262,11 +271,12 @@ const SchoolHub = () => {
                   {task.desc && <p style={{ fontSize: '0.8125rem', color: 'var(--p-text-muted)', marginBottom: '0.5rem' }}>{task.desc}</p>}
                   <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '0.75rem', color: 'var(--p-text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                      <Calendar size={13} /> Evento: {task.eventDate ? new Date(task.eventDate).toLocaleDateString('es-MX') : '—'}
+                      <Calendar size={13} /> {fmtDate(task.eventDate)}
+                      {task.eventTime && <span style={{ fontWeight: '700', color: 'var(--p-primary)' }}>· {task.eventTime}</span>}
                     </span>
                     {task.deadline && task.deadline !== task.eventDate && (
                       <span style={{ fontSize: '0.75rem', color: isUrgent ? 'var(--danger)' : 'var(--p-text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: isUrgent ? '700' : '400' }}>
-                        <Clock size={13} /> Límite: {new Date(task.deadline).toLocaleDateString('es-MX')}
+                        <Clock size={13} /> Límite: {fmtDate(task.deadline)}
                         {task.daysLeft >= 0 && ` (${task.daysLeft === 0 ? 'hoy' : `${task.daysLeft}d`})`}
                       </span>
                     )}

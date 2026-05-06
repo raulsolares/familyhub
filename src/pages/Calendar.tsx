@@ -153,9 +153,14 @@ const Calendar = () => {
                         <span style={{ fontSize: '1rem', marginLeft: '0.5rem' }}>{getMemberAvatar(ev.child)}</span>
                       </div>
                       {ev.desc && <p style={{ fontSize: '0.75rem', color: 'var(--p-text-muted)', marginBottom: '0.375rem' }}>{ev.desc}</p>}
-                      <div style={{ display: 'flex', gap: '0.375rem', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', gap: '0.375rem', flexWrap: 'wrap', alignItems: 'center' }}>
                         <span style={{ fontSize: '0.65rem', fontWeight: '700', padding: '2px 6px', borderRadius: '999px', background: CATEGORY_COLORS[ev.category] || '#14b8a6', color: 'white' }}>{ev.category}</span>
                         <span className="badge badge-blue" style={{ fontSize: '0.65rem' }}>{ev.child}</span>
+                        {ev.eventTime && (
+                          <span style={{ fontSize: '0.65rem', fontWeight: '700', color: 'var(--p-primary)', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                            <Clock size={9} /> {ev.eventTime}
+                          </span>
+                        )}
                         {ev.deadline && ev.deadline !== ev.eventDate && (
                           <span style={{ fontSize: '0.65rem', color: 'var(--p-text-muted)', display: 'flex', alignItems: 'center', gap: '2px' }}>
                             <Clock size={9} /> entrega: {new Date(ev.deadline + 'T12:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}
