@@ -6,7 +6,8 @@ import type { Food, Ingredient } from '../context/DataContext';
 
 const FoodManager = () => {
   const { role } = useUser();
-  const { foods, addFood, deleteFood, updateFood, ingredientItems, addIngredientItem, weeklyMenu, members } = useData();
+  const { foods, addFood, deleteFood, updateFood, clearFoods, ingredientItems, addIngredientItem, weeklyMenu, members } = useData();
+  const [confirmClear, setConfirmClear] = useState(false);
   const [activeTab, setActiveTab] = useState<'catalogo' | 'estadisticas'>('catalogo');
   const [activeIngSuggest, setActiveIngSuggest] = useState<number | null>(null);
   const suggestRef = useRef<HTMLDivElement>(null);
@@ -130,16 +131,50 @@ const FoodManager = () => {
           <h1 className="page-title">Alimentos</h1>
           <p className="page-subtitle">Catálogo nutricional y estadísticas de consumo</p>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <div className="tab-list">
             <button className={`tab-btn${activeTab === 'catalogo' ? ' active' : ''}`} onClick={() => setActiveTab('catalogo')}><UtensilsCrossed size={13} style={{ marginRight: 4 }} />Catálogo</button>
             <button className={`tab-btn${activeTab === 'estadisticas' ? ' active' : ''}`} onClick={() => setActiveTab('estadisticas')}><BarChart2 size={13} style={{ marginRight: 4 }} />Estadísticas</button>
           </div>
           {role === 'parent' && activeTab === 'catalogo' && (
-            <button className="btn-primary" onClick={() => setShowForm(true)}>+ Nuevo Platillo</button>
+            <>
+              <button className="btn-primary" onClick={() => setShowForm(true)}>+ Nuevo Platillo</button>
+              {foods.length > 0 && (
+                <button
+                  onClick={() => setConfirmClear(true)}
+                  style={{ padding: '0.5rem 0.875rem', borderRadius: 'var(--radius)', border: '1px solid #fecaca', background: '#fef2f2', color: '#ef4444', fontWeight: '700', fontSize: '0.8rem', cursor: 'pointer' }}
+                >
+                  <Trash2 size={13} style={{ marginRight: 4, verticalAlign: 'middle' }} />Limpiar catálogo
+                </button>
+              )}
+            </>
           )}
         </div>
       </header>
+
+      {/* Confirmación limpiar catálogo */}
+      {confirmClear && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
+          <div className="card" style={{ maxWidth: '380px', width: '100%', textAlign: 'center' }}>
+            <Trash2 size={32} color="#ef4444" style={{ margin: '0 auto 1rem' }} />
+            <h3 style={{ fontWeight: '800', fontSize: '1.1rem', marginBottom: '0.5rem' }}>¿Limpiar catálogo completo?</h3>
+            <p style={{ fontSize: '0.85rem', color: 'var(--p-text-muted)', marginBottom: '1.5rem' }}>
+              Se eliminarán todos los platillos e ingredientes registrados. Esta acción no se puede deshacer.
+            </p>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button onClick={() => setConfirmClear(false)} style={{ flex: 1, padding: '0.75rem', background: 'var(--p-background)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontWeight: '700', cursor: 'pointer' }}>
+                Cancelar
+              </button>
+              <button
+                onClick={() => { clearFoods(); setConfirmClear(false); }}
+                style={{ flex: 1, padding: '0.75rem', background: '#ef4444', border: 'none', borderRadius: 'var(--radius)', color: 'white', fontWeight: '800', cursor: 'pointer' }}
+              >
+                Sí, limpiar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Form */}
       {showForm && (

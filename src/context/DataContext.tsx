@@ -161,6 +161,7 @@ interface DataContextType {
   addFood: (food: Omit<Food, 'id'>) => void;
   updateFood: (id: string, food: Partial<Food>) => void;
   deleteFood: (id: string) => void;
+  clearFoods: () => void;
 
   addIngredientItem: (item: Omit<IngredientItem, 'id'>) => void;
   deleteIngredientItem: (id: string) => void;
@@ -321,10 +322,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   // ── CRUD ───────────────────────────────────────────────────────────────────
 
   const addFood = (f: Omit<Food, 'id'>) =>
-    setFoods([...foods, { ...f, id: Date.now().toString() }]);
+    setFoods(prev => [...prev, { ...f, id: `${Date.now()}-${Math.random().toString(36).slice(2)}` }]);
   const updateFood = (id: string, f: Partial<Food>) =>
     setFoods(foods.map(x => (x.id === id ? { ...x, ...f } as Food : x)));
   const deleteFood = (id: string) => setFoods(foods.filter(x => x.id !== id));
+  const clearFoods = () => { setFoods([]); setIngredientItems([]); };
 
   const addIngredientItem = (item: Omit<IngredientItem, 'id'>) =>
     setIngredientItems([...ingredientItems, { ...item, id: Date.now().toString() }]);
@@ -407,7 +409,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     setWeeklyMenu(weeklyMenu.map(x => (x.id === id ? { ...x, ate: !x.ate } : x)));
 
   const addSchoolTask = (t: Omit<SchoolTask, 'id' | 'completed'>) =>
-    setSchoolTasks([...schoolTasks, { ...t, id: Date.now().toString(), completed: false }]);
+    setSchoolTasks(prev => [...prev, { ...t, id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, completed: false }]);
   const updateSchoolTask = (id: string, t: Partial<SchoolTask>) =>
     setSchoolTasks(schoolTasks.map(x => (x.id === id ? { ...x, ...t } as SchoolTask : x)));
   const deleteSchoolTask = (id: string) =>
@@ -443,7 +445,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       foods, chores, schoolTasks, weeklyMenu, pointLogs, rules, members, routines,
       products, shoppingNotes, points, routineLogs, ingredientItems, schoolCategories,
       prizes, prizeRequests,
-      addFood, updateFood, deleteFood,
+      addFood, updateFood, deleteFood, clearFoods,
       addIngredientItem, deleteIngredientItem,
       addProduct, updateProduct, deleteProduct,
       addShoppingNote: (t) => setShoppingNotes([...shoppingNotes, { id: Date.now().toString(), text: t, createdAt: new Date().toISOString() }]),
