@@ -1,343 +1,288 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Plus, RefreshCw, Copy, ShoppingCart, BookOpen, Check, Lock, Unlock, X } from 'lucide-react';
 import { useData } from '../context/DataContext';
-import { X, CheckCircle2, User, Plus, Minus, RefreshCw } from 'lucide-react';
+import FoodPicker from '../components/FoodPicker';
+import { MEALS, MEAL_EMOJI, foodEmoji, getFoodUsage } from '../utils/food';
+import { WEEK_DAYS, todayName, weekStartKey, nextWeekStartKey, weekRange } from '../utils/dates';
+import WeekSwitch from '../components/WeekSwitch';
+import { useMealChanges } from '../hooks/useMealChanges';
+
+const FAMILY = '__familia';
 
 const WeeklyMenu = () => {
-  const { weeklyMenu, foods, assignMeal, toggleAte, clearWeeklyMenu } = useData();
+  const { menuOf, foods, members, foodGroupLimits, assignMeal, clearWeeklyMenu, isMenuLocked, unlockMenu, lockMenu } = useData();
+  const thisWeek = weekStartKey();
+  const nextWeek = nextWeekStartKey();
+  const [week, setWeek] = useState(thisWeek);
+  const weeklyMenu = menuOf(week);
+  const isNext = week === nextWeek;
+  const mealChanges = useMealChanges();
+  const [member, setMember] = useState(FAMILY);
+  const [picking, setPicking] = useState<{ day: string; meal: string; member: string } | null>(null);
   const [confirmNewWeek, setConfirmNewWeek] = useState(false);
+  const [copyFrom, setCopyFrom] = useState<string | null>(null);
+  const today = isNext ? '' : todayName();
 
-  const days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-  const meals = ['Desayuno', 'Snack', 'Lunch', 'Comida', 'Merienda', 'Cena'];
-  const members = ['Raúl', 'Tania', 'Alan', 'Aria'];
+  // Si hay datos en tiempos de comida extra (versiones anteriores), también se muestran
+  const meals = [...MEALS, ...['Snack', 'Merienda'].filter(m => weeklyMenu.some(w => w.meal === m && w.foodIds.length))];
 
-  const [showModal, setShowModal] = useState(false);
-  const [selectedSlot, setSelectedSlot] = useState<{ day: string, meal: string, member: string } | null>(null);
-  
-  // Estado para el modal de asignación múltiple
-  const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
-  const [selectedFoodIds, setSelectedFoodIds] = useState<string[]>([]);
-  const [foodQtys, setFoodQtys] = useState<Record<string, number>>({});
+  const slotFor = (day: string, meal: string, who = member) =>
+    weeklyMenu.find(w => w.day === day && w.meal === meal && w.member === who && w.foodIds.length > 0);
+  const filled = (who: string) => weeklyMenu.filter(w => w.member === who && w.foodIds.length > 0).length;
+  const countOf = (wk: string) => menuOf(wk).filter(w => w.foodIds.length > 0).length;
 
-  const handleSlotClick = (day: string, meal: string, member: string) => {
-    setSelectedSlot({ day, meal, member });
-    setSelectedMembers([member]);
-    
-    // Cargar los platillos actuales de esa celda si existen
-    const existing = weeklyMenu.find(w => w.day === day && w.meal === meal && w.member === member);
-    setSelectedFoodIds(existing ? existing.foodIds : []);
-    setFoodQtys(existing?.quantities || {});
-
-    setShowModal(true);
+  /** Copia todo el menú de esta semana a la próxima (para no empezar de cero) */
+  const copyThisWeek = () => {
+    menuOf(thisWeek).forEach(w => assignMeal(w.day, w.meal, w.foodIds, w.member, w.quantities, nextWeek));
   };
 
-  const handleAssign = () => {
-    if (selectedSlot) {
-      selectedMembers.forEach(m => {
-        assignMeal(selectedSlot.day, selectedSlot.meal, selectedFoodIds, m, foodQtys);
-      });
-    }
-    setShowModal(false);
-    setSelectedSlot(null);
-  };
+  const kids = members.filter(m => m.role === 'child');
+  const isFamily = member === FAMILY;
+  const memberObj = members.find(m => m.name === member);
+  const pick = (day: string, meal: string, who = member) => setPicking({ day, meal, member: who });
 
-  const toggleModalMember = (m: string) => {
-    if (selectedMembers.includes(m)) {
-      if (selectedMembers.length > 1) setSelectedMembers(selectedMembers.filter(x => x !== m));
-    } else {
-      setSelectedMembers([...selectedMembers, m]);
-    }
-  };
+  /** Vista familia: una línea por miembro dentro de cada comida */
+  const familyLines = (day: string, meal: string, compact: boolean) => members.map(m => {
+    const slot = slotFor(day, meal, m.name);
+    const items = slot ? slot.foodIds.map(fid => foods.find(f => f.id === fid)).filter(Boolean) : [];
+    return (
+      <button key={m.id} className={`fam-line${items.length ? '' : ' empty'}${slot?.ate ? ' ate' : ''}`} onClick={() => pick(day, meal, m.name)} aria-label={`${meal} del ${day} de ${m.name}`}>
+        <span className="fam-av">{m.avatar}</span>
+        {items.length
+          ? <span className="fam-food">{compact ? items.map(f => foodEmoji(f!)).join('') : items.map(f => `${foodEmoji(f!)} ${f!.name}`).join(', ')}</span>
+          : <span className="fam-food muted">{compact ? '·' : 'Sin asignar'}</span>}
+      </button>
+    );
+  });
 
-  const toggleModalFood = (id: string) => {
-    if (selectedFoodIds.includes(id)) {
-      setSelectedFoodIds(selectedFoodIds.filter(x => x !== id));
-      setFoodQtys(prev => { const n = { ...prev }; delete n[id]; return n; });
-    } else {
-      setSelectedFoodIds([...selectedFoodIds, id]);
-      setFoodQtys(prev => ({ ...prev, [id]: prev[id] || 1 }));
-    }
-  };
-
-  const setQty = (id: string, delta: number) => {
-    setFoodQtys(prev => {
-      const next = Math.max(1, (prev[id] || 1) + delta);
-      return { ...prev, [id]: next };
+  const copyDay = (from: string, to: string[]) => {
+    meals.forEach(meal => {
+      const src = slotFor(from, meal);
+      to.forEach(d => assignMeal(d, meal, src?.foodIds || [], member, src?.quantities || {}, week));
     });
+    setCopyFrom(null);
   };
 
-  const getMenuForSlot = (day: string, meal: string, member: string) => {
-    return weeklyMenu.find(w => w.day === day && w.meal === meal && w.member === member);
+  const cellContent = (day: string, meal: string) => {
+    const slot = slotFor(day, meal);
+    const items = slot ? slot.foodIds.map(fid => foods.find(f => f.id === fid)).filter(Boolean) : [];
+    return { slot, items };
   };
-
-  const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-  const today = dayNames[new Date().getDay()];
 
   return (
-    <div>
-      <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+    <div style={{ maxWidth: '1180px', margin: '0 auto' }}>
+      <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '1rem', flexWrap: 'wrap' }}>
         <div>
-          <h1 className="page-title">Planificación Alimenticia</h1>
-          <p className="page-subtitle">Menú personalizado para cada miembro de la familia</p>
+          <h1 className="page-title">Menú semanal</h1>
+          <p className="page-subtitle">Toca un espacio para elegir platillos. Los niños eligen los suyos desde su pantalla.</p>
         </div>
-        {weeklyMenu.length > 0 && (
-          <button
-            onClick={() => setConfirmNewWeek(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 0.875rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--p-background)', color: 'var(--p-text-muted)', fontWeight: '700', fontSize: '0.8rem', cursor: 'pointer' }}
-          >
-            <RefreshCw size={14} /> Nueva semana
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <Link to="/food" className="btn-secondary" style={{ textDecoration: 'none' }}><BookOpen size={14} /> Platillos</Link>
+          <Link to={`/shopping?week=${week}`} className="btn-secondary" style={{ textDecoration: 'none' }}><ShoppingCart size={14} /> Súper de esta lista</Link>
+          {weeklyMenu.length > 0 && (
+            <button className="btn-secondary" onClick={() => setConfirmNewWeek(true)}><RefreshCw size={14} /> Vaciar semana</button>
+          )}
+        </div>
       </header>
 
-      {confirmNewWeek && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
-          <div className="card" style={{ maxWidth: '380px', width: '100%', textAlign: 'center' }}>
-            <RefreshCw size={32} color="var(--p-primary)" style={{ margin: '0 auto 1rem' }} />
-            <h3 style={{ fontWeight: '800', fontSize: '1.1rem', marginBottom: '0.5rem' }}>¿Empezar nueva semana?</h3>
-            <p style={{ fontSize: '0.85rem', color: 'var(--p-text-muted)', marginBottom: '1.5rem' }}>
-              Se borrará todo el menú planificado. El catálogo de alimentos se mantiene intacto.
-            </p>
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
-              <button onClick={() => setConfirmNewWeek(false)} style={{ flex: 1, padding: '0.75rem', background: 'var(--p-background)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontWeight: '700', cursor: 'pointer' }}>
-                Cancelar
-              </button>
-              <button
-                onClick={() => { clearWeeklyMenu(); setConfirmNewWeek(false); }}
-                style={{ flex: 1, padding: '0.75rem', background: 'var(--p-primary)', border: 'none', borderRadius: 'var(--radius)', color: 'white', fontWeight: '800', cursor: 'pointer' }}
-              >
-                Sí, nueva semana
-              </button>
-            </div>
-          </div>
-        </div>
+      <div className="week-bar">
+        <WeekSwitch value={week} onChange={setWeek} note={wk => { const n = countOf(wk); return n ? `${n} comidas` : 'vacía'; }} />
+        {isNext && countOf(nextWeek) === 0 && countOf(thisWeek) > 0 && (
+          <button className="btn-secondary" onClick={copyThisWeek}><Copy size={14} /> Copiar la semana actual</button>
+        )}
+      </div>
+      {isNext && (
+        <p className="notice" style={{ marginBottom: '1rem' }}>
+          Estás planeando la próxima semana ({weekRange(nextWeek)}). La lista del súper puede armarse con este menú.
+        </p>
       )}
 
-      {/* Vista HOY */}
-      <div className="card" style={{ marginBottom: '2rem', border: '2px solid var(--p-primary)' }}>
-        <h3 className="card-title" style={{ color: 'var(--p-primary)' }}>📅 Resumen de HOY ({today})</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginTop: '1rem' }}>
-          {members.map(member => (
-            <div key={member} style={{ padding: '1rem', background: 'var(--p-background)', borderRadius: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-                <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: 'var(--p-primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 'bold' }}>{member[0]}</div>
-                <h4 style={{ fontWeight: '800' }}>{member}</h4>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {meals.map(meal => {
-                  const slot = getMenuForSlot(today, meal, member);
-                  if (!slot || slot.foodIds.length === 0) return null;
-                  
-                  const slotFoods = slot.foodIds.map(fid => foods.find(f => f.id === fid)?.name).filter(Boolean);
-                  
-                  return (
-                    <div 
-                      key={meal} 
-                      onClick={() => slot && toggleAte(slot.id)}
-                      style={{ 
-                        fontSize: '0.8rem', 
-                        padding: '0.5rem', 
-                        background: slot.ate ? '#dcfce7' : 'white', 
-                        borderRadius: '8px', 
-                        display: 'flex', 
-                        justifyContent: 'space-between', 
-                        alignItems: 'center',
-                        cursor: 'pointer',
-                        border: '1px solid var(--border)'
-                      }}
-                    >
-                      <div style={{ flex: 1 }}>
-                        <strong style={{ color: 'var(--p-primary)' }}>{meal}:</strong> 
-                        <div style={{ fontWeight: '600' }}>{slotFoods.join(' + ')}</div>
-                      </div>
-                      {slot.ate ? <CheckCircle2 size={16} color="#166534" /> : <div style={{ width: '14px', height: '14px', borderRadius: '50%', border: '1px solid #cbd5e1', marginLeft: '0.5rem' }} />}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+      <div className="planner-toolbar">
+        <div className="member-tabs" role="tablist">
+          <button role="tab" aria-selected={isFamily} className={`member-tab${isFamily ? ' on' : ''}`} onClick={() => setMember(FAMILY)}>
+            👨‍👩‍👧‍👦 Familia
+          </button>
+          {members.map(m => (
+            <button key={m.id} role="tab" aria-selected={member === m.name} className={`member-tab${member === m.name ? ' on' : ''}`} onClick={() => setMember(m.name)}>
+              {m.avatar} {m.name} <small>{filled(m.name)}</small>{m.role === 'child' && isMenuLocked(m.name, week) && <Lock size={11} />}
+            </button>
           ))}
         </div>
       </div>
 
-      {/* Modal de Asignación Múltiple */}
-      {showModal && selectedSlot && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
-          <div className="card" style={{ width: '100%', maxWidth: '500px', position: 'relative', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
-            <button onClick={() => setShowModal(false)} style={{ position: 'absolute', right: '1rem', top: '1rem', background: 'none', border: 'none', cursor: 'pointer' }}><X /></button>
-            <h3 className="card-title" style={{ marginBottom: '0.5rem' }}>Asignar {selectedSlot.meal}</h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--p-text-muted)', marginBottom: '1.5rem' }}>{selectedSlot.day}</p>
-            
-            <div style={{ marginBottom: '1.5rem' }}>
-              <p style={{ fontWeight: '700', fontSize: '0.85rem', marginBottom: '0.5rem' }}>¿Para quién es esta comida?</p>
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                {members.map(m => (
-                  <button 
-                    key={m} 
-                    onClick={() => toggleModalMember(m)}
-                    style={{ 
-                      padding: '0.4rem 0.8rem', 
-                      borderRadius: '999px', 
-                      border: '1px solid var(--p-primary)',
-                      background: selectedMembers.includes(m) ? 'var(--p-primary)' : 'transparent',
-                      color: selectedMembers.includes(m) ? 'white' : 'var(--p-primary)',
-                      fontWeight: '700', cursor: 'pointer', fontSize: '0.8rem'
-                    }}
-                  >
-                    {m}
-                  </button>
-                ))}
-              </div>
-            </div>
+      {memberObj?.role === 'child' && (
+        <div className={`notice${isMenuLocked(member, week) ? '' : ' warn'}`} style={{ marginBottom: '1rem', alignItems: 'center' }}>
+          {isMenuLocked(member, week) ? <Lock size={16} /> : <Unlock size={16} />}
+          <span style={{ flex: 1 }}>
+            {isMenuLocked(member, week)
+              ? <><b>{member} ya confirmó {isNext ? 'la próxima semana' : 'su semana'}.</b> Si quiere cambiar algo, te llega una solicitud para aprobar. Tú sí puedes editar.</>
+              : <><b>{member} aún no confirma {isNext ? 'la próxima semana' : 'su semana'}.</b> Puede elegir y cambiar libremente hasta que la confirme.</>}
+          </span>
+          {isMenuLocked(member, week)
+            ? <button className="btn-xs" onClick={() => unlockMenu(member, week)}><Unlock size={12} /> Desbloquear</button>
+            : <button className="btn-xs" onClick={() => lockMenu(member, week)}><Lock size={12} /> Confirmar por {member}</button>}
+        </div>
+      )}
 
-            <div style={{ flex: 1, overflowY: 'auto', marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', paddingRight: '0.5rem' }}>
-              <p style={{ fontWeight: '700', fontSize: '0.85rem' }}>Selecciona platillos y porciones:</p>
-              {foods.map(food => {
-                const selected = selectedFoodIds.includes(food.id);
-                const qty = foodQtys[food.id] || 1;
-                return (
-                  <div
-                    key={food.id}
-                    style={{
-                      padding: '0.625rem 0.75rem',
-                      background: selected ? '#eef2ff' : 'var(--p-background)',
-                      border: selected ? '2px solid var(--p-primary)' : '1px solid var(--border)',
-                      borderRadius: '8px',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                    }}
-                  >
-                    <button
-                      onClick={() => toggleModalFood(food.id)}
-                      style={{ flex: 1, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <span style={{ fontSize: '0.65rem', background: 'var(--p-primary)', color: 'white', padding: '0.15rem 0.4rem', borderRadius: '4px', flexShrink: 0 }}>{food.categories[0]}</span>
-                        <span style={{ fontWeight: '600', fontSize: '0.875rem', color: 'var(--p-text)' }}>{food.name}</span>
-                        {food.calories && <span style={{ fontSize: '0.7rem', color: 'var(--p-text-muted)' }}>{food.calories} kcal</span>}
-                      </div>
-                    </button>
-                    {selected ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}>
-                        <button onClick={() => setQty(food.id, -1)} style={{ width: '26px', height: '26px', borderRadius: '6px', border: '1px solid var(--border)', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Minus size={13} />
-                        </button>
-                        <span style={{ fontWeight: '800', fontSize: '0.875rem', color: 'var(--p-primary)', width: '24px', textAlign: 'center' }}>{qty}</span>
-                        <button onClick={() => setQty(food.id, 1)} style={{ width: '26px', height: '26px', borderRadius: '6px', border: '1px solid var(--border)', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Plus size={13} />
-                        </button>
-                      </div>
-                    ) : (
-                      <button onClick={() => toggleModalFood(food.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--p-text-muted)' }}>
-                        <Plus size={16} />
-                      </button>
-                    )}
+      {mealChanges.pending.length > 0 && (
+        <div className="panel" style={{ marginBottom: '1rem' }}>
+          <div className="panel-head"><h3>Cambios por aprobar</h3></div>
+          <div className="attention-list">
+            {mealChanges.pending.map(r => {
+              const d = mealChanges.describe(r);
+              return (
+                <div key={r.id} className="attention-item">
+                  <span className="attention-icon amber">{members.find(m => m.name === r.member)?.avatar}</span>
+                  <div className="attention-text"><b>{r.member}: {d.title}</b><span>{d.detail}</span></div>
+                  <div className="attention-actions">
+                    <button className="btn-xs" onClick={() => mealChanges.resolve(r.id, false)} aria-label="Rechazar cambio"><X size={13} /></button>
+                    <button className="btn-xs primary" onClick={() => mealChanges.resolve(r.id, true)}><Check size={13} /> Aprobar</button>
                   </div>
-                );
-              })}
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1rem' }}>
-              <button onClick={() => { setSelectedFoodIds([]); handleAssign(); }} style={{ padding: '1rem', background: '#fef2f2', color: '#ef4444', border: 'none', borderRadius: '12px', fontWeight: '700', cursor: 'pointer' }}>
-                Vaciar
-              </button>
-              <button onClick={handleAssign} className="btn-primary" style={{ padding: '1rem', borderRadius: '12px' }}>
-                Guardar Menú
-              </button>
-            </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
 
-      <div className="card" style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1000px' }}>
-          <thead>
-            <tr>
-              <th style={{ padding: '1rem', borderBottom: '2px solid var(--border)', textAlign: 'left' }}>Miembro / Comida</th>
-              {days.map(day => (
-                <th key={day} style={{ padding: '1rem', borderBottom: '2px solid var(--border)', textAlign: 'center' }}>{day}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {members.map(member => (
-              <React.Fragment key={member}>
-                <tr style={{ background: 'var(--p-background)' }}>
-                  <td colSpan={8} style={{ padding: '0.5rem 1rem', fontWeight: '800', fontSize: '0.9rem', color: 'var(--p-primary)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <User size={16} /> {member}
-                    </div>
-                  </td>
-                </tr>
-                {meals.map(meal => (
-                  <tr key={`${member}-${meal}`}>
-                    <td style={{ padding: '0.75rem 1.5rem', borderBottom: '1px solid var(--border)', fontSize: '0.85rem', fontWeight: '600' }}>{meal}</td>
-                    {days.map(day => {
-                      const slot = getMenuForSlot(day, meal, member);
-                      const hasFood = slot && slot.foodIds.length > 0;
-                      
-                      return (
-                        <td key={`${day}-${meal}-${member}`} style={{ padding: '0.25rem', borderBottom: '1px solid var(--border)', textAlign: 'center' }}>
-                          <div 
-                            onClick={() => handleSlotClick(day, meal, member)}
-                            style={{ 
-                              padding: '0.4rem', 
-                              backgroundColor: hasFood ? '#eef2ff' : 'var(--p-background)', 
-                              color: hasFood ? 'var(--p-primary)' : 'var(--p-text-muted)',
-                              borderRadius: '8px', 
-                              fontSize: '0.7rem',
-                              minHeight: '50px',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: 'pointer',
-                              border: hasFood ? '1px solid #c7d2fe' : '1px dashed var(--border)',
-                              fontWeight: hasFood ? '700' : '400',
-                              gap: '0.2rem'
-                            }}>
-                            {hasFood ? (
-                              slot.foodIds.map(fid => {
-                                const fName = foods.find(f => f.id === fid)?.name;
-                                return fName ? <span key={fid}>{fName}</span> : null;
-                              })
-                            ) : <Plus size={14} color="#cbd5e1" />}
-                          </div>
-                        </td>
-                      )
-                    })}
-                  </tr>
-                ))}
-              </React.Fragment>
-            ))}
-          </tbody>
-        </table>
+      {/* Escritorio: cuadrícula */}
+      <div className="week-grid">
+        <div className="wg-head" />
+        {WEEK_DAYS.map(d => (
+          <div key={d} className={`wg-head${d === today ? ' today' : ''}`}>
+            {d}
+            {!isFamily && <button className="btn-icon" style={{ padding: '2px', marginLeft: '2px' }} title={`Copiar ${d} a otros días`} aria-label={`Copiar ${d}`} onClick={() => setCopyFrom(d)}><Copy size={11} /></button>}
+          </div>
+        ))}
+        {meals.map(meal => (
+          <div key={meal} style={{ display: 'contents' }}>
+            <div className="wg-meal">{MEAL_EMOJI[meal]} {meal}</div>
+            {WEEK_DAYS.map(day => {
+              const { slot, items } = cellContent(day, meal);
+              if (isFamily) return <div key={day} className={`wg-fam${day === today ? ' today' : ''}`}>{familyLines(day, meal, true)}</div>;
+              return (
+                <div key={day}>
+                  <button className={`wg-cell${day === today ? ' today' : ''}${slot?.ate ? ' ate' : ''}`} onClick={() => pick(day, meal)} aria-label={`${meal} del ${day}`}>
+                    {items.length ? (
+                      <>
+                        <span className="wg-emojis">{items.map(f => foodEmoji(f!)).join('')}</span>
+                        <span className="wg-names">{items.map(f => {
+                          const q = slot!.quantities?.[f!.id] || 1;
+                          return q > 1 ? `${f!.name} ×${q}` : f!.name;
+                        }).join(', ')}{slot?.ate ? ' ✓' : ''}</span>
+                      </>
+                    ) : <Plus size={16} className="wg-add" />}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        ))}
       </div>
 
-      <div style={{ marginTop: '2rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-        <div className="card">
-          <h3 className="card-title">📖 Catálogo de Alimentos</h3>
-          <p style={{ color: 'var(--p-text-muted)', fontSize: '0.9rem', marginBottom: '1rem' }}>
-            Gestiona los ingredientes detallados para tu lista de súper.
-          </p>
-          <Link to="/food">
-            <button className="btn-primary">Ir al Catálogo</button>
-          </Link>
-        </div>
-        <div className="card">
-          <h3 className="card-title">🛒 Lista de Súper Inteligente</h3>
-          <p style={{ color: 'var(--p-text-muted)', fontSize: '0.9rem', marginBottom: '1rem' }}>
-            Calcula automáticamente las cantidades basadas en todo el menú familiar.
-          </p>
-          <Link to="/shopping">
-            <button style={{ padding: '0.75rem 1rem', backgroundColor: 'var(--p-surface)', color: 'var(--p-primary)', border: '2px solid var(--p-primary)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontWeight: '600' }}>
-              Ver Lista
-            </button>
-          </Link>
-        </div>
+      {/* Celular: lista por día */}
+      <div className="week-list">
+        {WEEK_DAYS.map(day => (
+          <div key={day} className="week-day">
+            <div className={`week-day-head${day === today ? ' today' : ''}`}>
+              <span>{day}{day === today ? ' · hoy' : ''}</span>
+              {!isFamily && <button className="btn-icon" style={{ padding: '2px' }} aria-label={`Copiar ${day}`} onClick={() => setCopyFrom(day)}><Copy size={13} /></button>}
+            </div>
+            {meals.map(meal => {
+              const { slot, items } = cellContent(day, meal);
+              if (isFamily) return (
+                <div key={meal} className="week-day-fam">
+                  <span className="wd-meal">{MEAL_EMOJI[meal]} {meal}</span>
+                  <div>{familyLines(day, meal, false)}</div>
+                </div>
+              );
+              return (
+                <button key={meal} className="week-day-row" onClick={() => pick(day, meal)}>
+                  <span className="wd-meal">{MEAL_EMOJI[meal]} {meal}</span>
+                  <span className="wd-food">
+                    {items.length
+                      ? <>{items.map(f => `${foodEmoji(f!)} ${f!.name}`).join(', ')}{slot?.ate && <Check size={13} color="var(--success)" style={{ marginLeft: 4, verticalAlign: 'middle' }} />}</>
+                      : <span className="wd-empty">Sin asignar</span>}
+                  </span>
+                  <Plus size={15} color="var(--p-text-subtle)" />
+                </button>
+              );
+            })}
+          </div>
+        ))}
       </div>
+
+      {/* Topes de la semana por niño */}
+      {kids.length > 0 && Object.keys(foodGroupLimits).length > 0 && (
+        <div className="panel" style={{ marginTop: '1.25rem' }}>
+          <div className="panel-head">
+            <h3>Topes semanales</h3>
+            <Link to="/food">Ajustar</Link>
+          </div>
+          <div className="panel-body limits-summary">
+            {kids.map(k => {
+              const usage = getFoodUsage(weeklyMenu, foods, k.name);
+              return (
+                <div key={k.id} className="limit-meter">
+                  <p style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.25rem' }}>{k.avatar} {k.name}</p>
+                  {Object.entries(foodGroupLimits).map(([g, lim]) => {
+                    const used = usage.byGroup[g] || 0;
+                    return (
+                      <div key={g} className="limit-meter-row">
+                        <span>{g}</span>
+                        <div className="limit-meter-bar"><div className={used >= lim ? 'full' : ''} style={{ width: `${Math.min(100, (used / Math.max(lim, 1)) * 100)}%` }} /></div>
+                        <b>{used}/{lim}</b>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {picking && (
+        <FoodPicker mode="parent" member={picking.member} day={picking.day} meal={picking.meal} week={week} onClose={() => setPicking(null)} />
+      )}
+
+      {copyFrom && (
+        <div className="sheet-overlay" onClick={() => setCopyFrom(null)}>
+          <div className="sheet" style={{ maxWidth: '420px' }} onClick={e => e.stopPropagation()}>
+            <div className="sheet-head">
+              <div>
+                <p className="sheet-kicker">{member}</p>
+                <h2 className="sheet-title">Copiar el {copyFrom} a…</h2>
+              </div>
+            </div>
+            <div className="sheet-body">
+              <p className="text-sm text-muted" style={{ marginBottom: '0.75rem' }}>Reemplaza el menú de esos días con el del {copyFrom}.</p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.375rem' }}>
+                <button className="chip" onClick={() => copyDay(copyFrom, WEEK_DAYS.filter(d => d !== copyFrom && !['Sábado', 'Domingo'].includes(d)))}>Lunes a viernes</button>
+                <button className="chip" onClick={() => copyDay(copyFrom, WEEK_DAYS.filter(d => d !== copyFrom))}>Toda la semana</button>
+                {WEEK_DAYS.filter(d => d !== copyFrom).map(d => (
+                  <button key={d} className="chip" onClick={() => copyDay(copyFrom, [d])}>{d}</button>
+                ))}
+              </div>
+            </div>
+            <div className="sheet-foot"><button className="btn-secondary" onClick={() => setCopyFrom(null)}>Cancelar</button></div>
+          </div>
+        </div>
+      )}
+
+      {confirmNewWeek && (
+        <div className="sheet-overlay" onClick={() => setConfirmNewWeek(false)}>
+          <div className="sheet" style={{ maxWidth: '400px' }} onClick={e => e.stopPropagation()}>
+            <div className="sheet-head"><h2 className="sheet-title">¿Vaciar {isNext ? 'la próxima semana' : 'esta semana'}?</h2></div>
+            <div className="sheet-body"><p className="text-sm text-muted">Se borra el menú de toda la familia de {weekRange(week)} y sus confirmaciones. Los platillos del catálogo se quedan.</p></div>
+            <div className="sheet-foot" style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+              <button className="btn-secondary" onClick={() => setConfirmNewWeek(false)}>Cancelar</button>
+              <button className="btn-primary" onClick={() => { clearWeeklyMenu(week); setConfirmNewWeek(false); }}>Sí, vaciar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

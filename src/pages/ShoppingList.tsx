@@ -5,6 +5,9 @@ import {
   RefreshCw, Package, MessageSquare, FileText, BookOpen,
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
+import { useShoppingWeek } from '../hooks/useShoppingWeek';
+import { weekStartKey } from '../utils/dates';
+import WeekSwitch from '../components/WeekSwitch';
 import type { Product, Food, ExtraItem } from '../context/DataContext';
 
 type Tab = 'lista' | 'extras' | 'notas' | 'catalogo';
@@ -16,12 +19,13 @@ const PRICE_CATS = ['Frutas y Verduras', 'Proteínas', 'Lácteos', 'Abarrotes', 
 
 const ShoppingList = () => {
   const {
-    weeklyMenu, foods, products, addProduct, updateProduct, deleteProduct,
+    foods, products, addProduct, updateProduct, deleteProduct,
     customShoppingItems, addCustomShoppingItem, toggleCustomShoppingItem,
     deleteCustomShoppingItem, clearCustomShoppingItems,
     extraItems, addExtraItem, updateExtraItem, deleteExtraItem,
     shoppingNotes, addShoppingNote, deleteShoppingNote,
   } = useData();
+  const { week, setWeek, menu: weeklyMenu } = useShoppingWeek();
 
   const [activeTab, setActiveTab] = useState<Tab>('lista');
   const [catalogTab, setCatalogTab] = useState<CatalogTab>('extras');
@@ -93,7 +97,7 @@ const ShoppingList = () => {
   const handleProductSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const payload = { name: pName, price: pPrice, defaultQty: pQty, unit: pUnit, category: pCategory };
-    editingProduct ? updateProduct(editingProduct.id, payload) : addProduct(payload);
+    if (editingProduct) updateProduct(editingProduct.id, payload); else addProduct(payload);
     setPName(''); setPPrice(0); setPQty(1); setEditingProduct(null); setShowProductForm(false);
   };
 
@@ -101,7 +105,7 @@ const ShoppingList = () => {
     e.preventDefault();
     if (!eName.trim()) return;
     const payload = { name: eName.trim(), unit: eUnit, category: eCategory, price: ePrice ? Number(ePrice) : undefined };
-    editingExtra ? updateExtraItem(editingExtra.id, payload) : addExtraItem(payload);
+    if (editingExtra) updateExtraItem(editingExtra.id, payload); else addExtraItem(payload);
     setEName(''); setEUnit('pzas'); setECategory('Limpieza'); setEPrice(''); setEditingExtra(null); setShowExtraForm(false);
   };
 
@@ -148,12 +152,15 @@ const ShoppingList = () => {
           <h1 className="page-title">Lista del Súper</h1>
           <p className="page-subtitle">Ingredientes del menú, extras, notas y catálogos</p>
         </div>
-        <Link to="/shopping/mode">
-          <button className="btn-primary" style={{ background: '#10b981', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <ShoppingBasket size={16} /> IR AL SÚPER
-          </button>
+        <Link to={`/shopping/mode?week=${week}`} className="btn-primary" style={{ background: '#10b981', display: 'inline-flex', gap: '0.5rem', alignItems: 'center', textDecoration: 'none' }}>
+          <ShoppingBasket size={16} /> IR AL SÚPER
         </Link>
       </header>
+
+      <div style={{ marginBottom: '1rem' }}>
+        <p className="eyebrow" style={{ marginBottom: '0.375rem' }}>Ingredientes del menú de</p>
+        <WeekSwitch value={week} onChange={setWeek} note={w => (w === week ? `${weeklyMenu.filter(x => x.foodIds.length).length} comidas` : undefined)} />
+      </div>
 
       {/* Tabs */}
       <div className="tab-list" style={{ marginBottom: '1.5rem' }}>
@@ -174,9 +181,9 @@ const ShoppingList = () => {
 
       {/* ── INGREDIENTES DEL MENÚ ── */}
       {activeTab === 'lista' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem' }}>
+        <div className="split split-2-1">
           <div className="card">
-            <h3 className="card-title" style={{ marginBottom: '1.25rem' }}>Ingredientes necesarios esta semana</h3>
+            <h3 className="card-title" style={{ marginBottom: '1.25rem' }}>Ingredientes necesarios {week === weekStartKey() ? 'esta semana' : 'la próxima semana'}</h3>
             {menuItems.length === 0 ? (
               <div className="empty-state">
                 <Package size={32} color="var(--p-text-subtle)" style={{ margin: '0 auto 0.5rem' }} />
@@ -189,7 +196,7 @@ const ShoppingList = () => {
                     <span style={{ fontWeight: '700', fontSize: '0.875rem', flex: 1 }}>{item.name}</span>
                     <span style={{ fontWeight: '800', color: 'var(--p-primary)', fontSize: '0.875rem', width: '80px', textAlign: 'right' }}>{item.qty % 1 === 0 ? item.qty : item.qty.toFixed(1)} {item.unit}</span>
                     <span style={{ fontWeight: '600', fontSize: '0.8rem', color: 'var(--p-text-muted)', width: '60px', textAlign: 'right' }}>{item.price > 0 ? `$${item.price.toFixed(0)}` : '—'}</span>
-                    <span className="badge badge-gray" style={{ fontSize: '0.65rem', flexShrink: 0 }}>{item.category}</span>
+                    <span className="badge badge-gray shop-cat" style={{ fontSize: '0.65rem', flexShrink: 0 }}>{item.category}</span>
                   </div>
                 ))}
               </div>
@@ -213,7 +220,7 @@ const ShoppingList = () => {
 
       {/* ── EXTRAS ── */}
       {activeTab === 'extras' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '1.5rem', alignItems: 'start' }}>
+        <div className="split split-side">
 
           {/* Lista de esta semana */}
           <div className="card">
@@ -310,7 +317,7 @@ const ShoppingList = () => {
                   const found = extraItems.find(ei => ei.name.toLowerCase() === e.target.value.trim().toLowerCase());
                   if (found) { if (found.price) setExtraListPrice(found.price); setExtraListUnit(found.unit); }
                 }} placeholder="Ej: Papel de baño" style={{ padding: '0.625rem 0.75rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)', fontSize: '0.875rem' }} />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
+                <div className="grid-3" style={{ gap: '0.5rem' }}>
                   <input type="number" min="1" value={extraListQty} onChange={e => setExtraListQty(Number(e.target.value))} placeholder="Cant." style={{ padding: '0.5rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)', fontSize: '0.875rem' }} />
                   <select value={extraListUnit} onChange={e => setExtraListUnit(e.target.value)} style={{ padding: '0.5rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)', fontSize: '0.875rem' }}>
                     {UNITS.map(u => <option key={u}>{u}</option>)}
@@ -353,7 +360,7 @@ const ShoppingList = () => {
 
       {/* ── NOTAS ── */}
       {activeTab === 'notas' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '1.5rem', alignItems: 'start' }}>
+        <div className="split split-side">
           <div className="card">
             <h3 className="card-title" style={{ marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <FileText size={16} color="var(--p-primary)" /> Notas para el súper

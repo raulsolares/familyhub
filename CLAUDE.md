@@ -26,26 +26,80 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=
 VITE_FIREBASE_APP_ID=
 ```
 
-Sin estas variables, la app funciona en modo offline con LocalStorage como fallback.
+Para notificaciones push (opcional, requiere Firebase) agregar también en Vercel:
+
+```
+VITE_VAPID_PUBLIC_KEY=   # misma llave pública, expuesta al navegador
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=mailto:tu@correo.com
+CRON_SECRET=             # opcional; Vercel lo manda a las crons
+```
+
+Las llaves se generan con `npx web-push generate-vapid-keys`.
+
+Las variables `VITE_FIREBASE_*` deben estar en Vercel tanto en **Production** como en **Preview**; si faltan, esa versión guarda solo en el dispositivo y el aviso `SyncBadge` lo dice (Dashboard, Calendario, Configuración).
+
+Para probar la sincronización localmente con el emulador de Firestore: `VITE_FIRESTORE_EMULATOR=localhost:8080` (solo desarrollo).
+
+Sin estas variables, la app guarda todo en `localStorage` (clave `fh_state_v2`) de ese dispositivo. Con Firebase, además sincroniza en tiempo real entre dispositivos. En el primer arranque se cargan datos de ejemplo (`src/data/seed.ts`).
 
 ## Arquitectura
 
 **Stack:** React 19 + TypeScript + Vite + React Router v7 + Firebase Firestore + Lucide React.
 
-**Deploy:** Vercel. `vercel.json` redirige todo a `index.html` para SPA routing.
+**Deploy:** Vercel. `vercel.json` redirige todo excepto `/api/*` a `index.html` (SPA routing) y define dos crons diarias.
+
+### Notificaciones push
+
+- Cliente: `src/utils/push.ts` (suscribir dispositivo, `notify()` que hace POST a `/api/push/notify`), `src/hooks/usePush.ts`, panel en Configuración → Notificaciones. Las suscripciones se guardan en el estado (`pushSubscriptions`, por miembro) y se sincronizan a Firestore.
+- Servidor (funciones de Vercel en `api/`): `api/push/notify.ts` envía con `web-push` leyendo el documento de Firestore; `api/cron/digest.ts?slot=morning|evening` manda el resumen de 7:00 y los recordatorios de 19:30 (hora de México). Helpers en `api/_lib/family.ts`. `api/` se revisa con su propio `api/tsconfig.json`.
+- `public/sw.js` muestra la notificación y abre la URL al tocarla.
+- Limitación: `/api/push/notify` no tiene autenticación (igual que Firestore).
+
+### Calendario
+
+- `FamilyEvent` admite `repeat` (diario/semanal con días/mensual/anual, `interval`, `until`), `assignments` (quién hace qué), `endTime` y `location`. Las repeticiones se expanden con `src/utils/events.ts` (sin dependencias; también lo usa `/api`).
+- `src/utils/agenda.ts` (`buildAgenda`) junta eventos, escuela y calendarios suscritos para Calendario, Dashboard y la cabina de niños. `EventSheet` muestra el evento completo; `EventForm` lo crea/edita.
+- Calendarios externos (`calendarFeeds`): se suscriben con la dirección iCal (p. ej. la "dirección secreta" de Google Calendar). `api/calendar/feed.ts` descarga y expande el .ics con `ical.js` (`api/_lib/ics.ts`); `src/hooks/useCalendarFeeds.ts` refresca cada 15 min y cachea en `localStorage` (`fh_feeds_cache`). Solo lectura.
+
+### Comida semanal con aprobación
+
+- Semanas: cada `WeeklyMenuItem` lleva `week` (lunes YYYY-MM-DD). `weeklyMenu` del contexto es siempre la semana actual; `menuOf(week)` da cualquier semana. Se guardan la semana pasada, la actual y la próxima. `WeekSwitch` cambia entre esta semana y la próxima (Menú semanal, Súper, Modo súper); el súper (`useShoppingWeek`, `?week=`) usa la próxima si ya tiene menú. Los bloqueos son `menuLocks["miembro@lunes"]`.
+
+- El niño elige su semana y la confirma (`menuLocks[miembro] = lunes de la semana`). Ya confirmada, cada cambio es una `MealChangeRequest` (`swap` con otro día o `replace` por otros platillos) que los papás aprueban en el Dashboard o en Menú semanal (`useMealChanges`), con aviso push en ambos sentidos. `clearWeeklyMenu` reinicia bloqueos y solicitudes.
+
+### Interfaz de niños (cabina espacial)
+
+- `src/styles/space.css` define el tema `theme-fun` (fondo de estrellas, paneles HUD, fuente Orbitron) y todos los estilos de niños.
+- `components/Cockpit.tsx`: indicadores (energía, combustible XP, racha, estrellas) y misiones con efectos (misión cumplida, combo, ascenso de rango, hipersalto). `pages/KidDuel.tsx` (`/duel`) es la cabina doble: un `Cockpit` por niño lado a lado para usar el mismo iPad.
+
+### Rutinas, hábitos y ánimo
+
+- `Chore` admite `icon`, `days` (0 = domingo), `time` y `since`; `Routine` admite `taskIcons`, `days` y `since`. Lo que toca cada día y el cumplimiento se calcula en `src/utils/habits.ts` (`todayMissions`, `habitsOn`, `dayScore`, rachas). Los dibujitos se sugieren desde el texto con `src/utils/icons.ts`.
+- Historial: `routineLogs` (`fecha_rutina_paso`) y `choreLogs` (`fecha_tarea`), 90 días. `habitsSince` marca desde cuándo hay historial completo.
+- `/today` (`KidToday.tsx`): agenda del día del niño con "ahora", cuenta regresiva y línea de tiempo (rutinas, tareas con hora, comidas con `MEAL_TIMES`, eventos). `/habits` (`Habits.tsx`): cumplimiento diario por niño (papás y niños).
+- Ánimo: `moodLogs` (mañana/tarde/noche, `src/utils/mood.ts`), registrado en `MoodCheck` dentro de la cabina; los ánimos difíciles avisan a los papás por push.
+- `speak()` en `src/utils/audio.ts` lee en voz alta pasos y agenda para niños que no leen.
 
 ### Flujo de Estado Global
 
 Todo el estado de la aplicación vive en **dos contextos**:
 
-1. **`UserContext`** (`src/context/UserContext.tsx`): Autenticación local (sin Firebase Auth). Login hardcoded con password `1234` para los 4 miembros. Persiste en `localStorage` (`fh_auth`, `fh_user`). Gestiona el tema activo (`light` | `dark` | `fun`).
+1. **`UserContext`** (`src/context/UserContext.tsx`): Sesión local (sin Firebase Auth). La pantalla de acceso muestra los miembros de `DataContext`; los papás entran con PIN (inicial `1234`, editable en Configuración → Familia) y los niños entran directo salvo que se les ponga PIN. Persiste en `localStorage` (`fh_auth`, `fh_user`). Gestiona el tema activo (`light` | `dark` | `fun`).
 
-2. **`DataContext`** (`src/context/DataContext.tsx`): Toda la data de la app. Se sincroniza con un **único documento Firestore** en `familyhub/main_state`. Al arrancar, `onSnapshot` escucha cambios en tiempo real. Cada mutación llama a `setDoc` para persistir en la nube. Si `db` es `null` (sin config de Firebase), funciona solo con estado en memoria.
+2. **`DataContext`** (`src/context/DataContext.tsx`): Toda la data de la app en un solo objeto de estado. Siempre se guarda en `localStorage`; si hay Firebase, se sincroniza con un **único documento Firestore** en `familyhub/main_state` (`onSnapshot` + `setDoc` con `mergeFields` solo de las secciones que cambiaron contra la última copia de la nube, para que dos dispositivos no se pisen). `sync` (`local|connecting|synced|error`) y `retrySync()` alimentan `SyncBadge`; si falla, reintenta solo. `normalize()` migra datos de versiones anteriores.
+   - Tareas (`Chore`): el estado `Hecho/Pendiente` se deriva de `lastDone`; las diarias se reinician cada día y las semanales (freq contiene "seman") cada lunes.
+   - Puntos: cada `PointLog` automático lleva `sourceKey` para no duplicar y para revertirse al desmarcar.
+   - Comida: `Food.maxPerWeek` (por platillo) y `foodGroupLimits` (por `Food.group`) limitan lo que cada niño elige por semana (`src/utils/food.ts`).
+   - Gamificación (niveles por XP ganada, rachas, insignias): `src/utils/gamification.ts`.
 
 ### Roles y Temas
 
 - **Padres** (Raúl, Tania): tema `light` o `dark`, acceso completo.
 - **Hijos** (Alan, Aria): tema `fun` (rosa/kids), redirigidos automáticamente a `KidZone` desde el Dashboard.
+
+Estilos: `src/styles/App.css` (tokens y base) + `src/styles/design.css` (sistema de diseño actual: papás sobrio con Inter, niños con Nunito y colores vivos; sheets, dashboard, menú, navegación móvil).
 
 El tema se aplica como clase CSS en el wrapper raíz (`theme-light`, `theme-dark`, `theme-fun`) definido en `src/styles/App.css` usando custom properties CSS (`--p-primary`, `--p-background`, etc.).
 
@@ -57,24 +111,25 @@ El tema se aplica como clase CSS en el wrapper raíz (`theme-light`, `theme-dark
 
 | Ruta | Archivo | Descripción |
 |---|---|---|
-| `/` | `App.tsx` (Dashboard) | Centro de comando con widgets de urgencias, puntos, menú del día |
+| `/` | `Dashboard.tsx` | Centro de comando con widgets de urgencias, puntos, menú del día |
 | `/menu` | `WeeklyMenu.tsx` | Planificación de menú semanal por miembro y tiempo de comida |
 | `/food` | `FoodManager.tsx` | Catálogo de alimentos con ingredientes, categorías y favoritos |
 | `/shopping` | `ShoppingList.tsx` | Lista de compras con cálculo automático desde el menú |
 | `/shopping/mode` | `ShoppingMode.tsx` | Interfaz móvil para marcar items en el super |
 | `/chores` | `Chores.tsx` | Tareas del hogar + rutinas por miembro |
 | `/school` | `SchoolHub.tsx` | Pendientes escolares con fechas y alertas |
+| `/today` | `KidToday.tsx` | Agenda del día del niño con cuenta regresiva |
+| `/habits` | `Habits.tsx` | Hábitos, cumplimiento diario y estado de ánimo |
+| `/calendar` | `Calendar.tsx` | Calendario mensual con eventos familiares y pendientes escolares |
 | `/rewards` | `Rewards.tsx` | Puntos, historial y tienda de premios |
 | `/duel` | `KidDuel.tsx` | Pantalla dividida competencia entre Alan y Aria |
 | `/settings` | `Settings.tsx` | Panel maestro de configuración de todos los módulos |
 
 ### Interfaces TypeScript Clave
 
-Todas las interfaces del dominio están en `DataContext.tsx`: `Food`, `WeeklyMenuItem`, `Product`, `Chore`, `Routine`, `SchoolTask`, `Rule`, `PointLog`, `Member`.
+Todas las interfaces del dominio están en `DataContext.tsx`: `Food`, `WeeklyMenuItem`, `Product`, `Chore`, `Routine`, `SchoolTask`, `MoodLog`, `FamilyEvent`, `Rule`, `PointLog`, `Member`.
 
 ## Pendientes Conocidos
 
 - Audio: sistema de assets de audio reales (actualmente mocks).
-- Calendario (`/calendar`): placeholder, sin implementar.
-- Notificaciones push via Service Workers.
 - Reglas de seguridad de Firestore (actualmente abiertas).

@@ -1,7 +1,12 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
+import { todayKey, weekStartKey } from '../utils/dates';
+import {
+  SEED_MEMBERS, SEED_FOODS, SEED_FOOD_GROUP_LIMITS, SEED_PRODUCTS, SEED_ROUTINES,
+  SEED_CHORES, SEED_PRIZES, SEED_RULES, SEED_EVENTS,
+} from '../data/seed';
 
 // ── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -23,7 +28,12 @@ export interface Food {
   name: string;
   categories: string[];
   ingredients: Ingredient[];
+  /** Máximo de porciones por niño a la semana */
   maxPerWeek?: number;
+  /** Grupo (Dulces, Comida rápida...) con tope semanal en foodGroupLimits */
+  group?: string;
+  /** Emoji para mostrar el platillo (sobre todo a los niños) */
+  emoji?: string;
   isFavorite?: boolean;
   calories?: number;
   prepTime?: number;
@@ -32,6 +42,8 @@ export interface Food {
 
 export interface WeeklyMenuItem {
   id: string;
+  /** Lunes (YYYY-MM-DD) de la semana a la que pertenece */
+  week?: string;
   day: string;
   meal: string;
   foodIds: string[];
@@ -60,9 +72,20 @@ export interface Chore {
   name: string;
   user: string;
   freq: string;
+  /** Derivado de lastDone: se reinicia cada día (o cada semana si freq es semanal) */
   status: 'Hecho' | 'Pendiente';
   points: number;
   routineId?: string;
+  lastDone?: string;
+  doneBy?: string;
+  /** Dibujito (emoji) para niños que no leen; si falta se deduce del nombre */
+  icon?: string;
+  /** Días en que toca (0 = domingo … 6 = sábado). Vacío = según freq */
+  days?: number[];
+  /** Hora sugerida (HH:MM) para la agenda del día */
+  time?: string;
+  /** Fecha de creación (YYYY-MM-DD): antes no cuenta para hábitos */
+  since?: string;
 }
 
 export interface Routine {
@@ -73,6 +96,12 @@ export interface Routine {
   tasks: string[];
   icon: string;
   imageUrl?: string;
+  /** Emoji de cada paso (mismo orden que tasks); si falta se deduce del texto */
+  taskIcons?: string[];
+  /** Días en que toca (0 = domingo … 6 = sábado). Vacío = todos */
+  days?: number[];
+  /** Fecha de creación (YYYY-MM-DD): antes no cuenta para hábitos */
+  since?: string;
 }
 
 export interface SchoolTask {
@@ -85,6 +114,73 @@ export interface SchoolTask {
   deadline: string;
   category: string;
   completed: boolean;
+}
+
+export interface EventRepeat {
+  freq: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  /** Cada cuántos días/semanas/meses/años (1 = todos) */
+  interval?: number;
+  /** Para semanales: días de la semana (0 = domingo … 6 = sábado). Vacío = el mismo día que `date` */
+  weekdays?: number[];
+  /** Última fecha (YYYY-MM-DD), opcional */
+  until?: string;
+}
+
+export interface EventAssignment {
+  member: string;
+  task: string;
+}
+
+export interface FamilyEvent {
+  id: string;
+  title: string;
+  date: string;
+  time?: string;
+  endTime?: string;
+  /** Nombres de miembros, o 'Familia' */
+  members: string[];
+  color?: string;
+  notes?: string;
+  location?: string;
+  repeat?: EventRepeat;
+  /** Quién hace qué en el evento */
+  assignments?: EventAssignment[];
+}
+
+export interface CalendarFeed {
+  id: string;
+  name: string;
+  /** Dirección iCal (.ics) del calendario, p. ej. la "dirección secreta" de Google Calendar */
+  url: string;
+  color: string;
+  members: string[];
+}
+
+export interface MealChangeRequest {
+  id: string;
+  /** Lunes de la semana del cambio (por omisión, la actual) */
+  week?: string;
+  member: string;
+  day: string;
+  meal: string;
+  /** swap: intercambiar con el mismo tiempo de comida de otro día. replace: elegir otros platillos */
+  kind: 'swap' | 'replace';
+  swapDay?: string;
+  foodIds?: string[];
+  quantities?: { [foodId: string]: number };
+  status: 'pending' | 'approved' | 'rejected';
+  date: string;
+}
+
+export interface MoodLog {
+  id: string;
+  member: string;
+  /** YYYY-MM-DD */
+  date: string;
+  slot: 'morning' | 'afternoon' | 'evening';
+  /** id de MOODS (utils/mood.ts) */
+  mood: string;
+  at: string;
 }
 
 export interface Rule {
@@ -102,6 +198,8 @@ export interface PointLog {
   appliedBy?: string;
   points: number;
   date: string;
+  /** Identifica el origen (tarea/rutina/día) para no duplicar ni dejar puntos huérfanos */
+  sourceKey?: string;
 }
 
 export interface Member {
@@ -109,6 +207,8 @@ export interface Member {
   name: string;
   role: 'parent' | 'child';
   avatar: string;
+  /** PIN de acceso. Opcional para niños. */
+  pin?: string;
 }
 
 export interface Prize {
@@ -140,6 +240,15 @@ export interface CustomShoppingItem {
   createdAt: string;
 }
 
+export interface PushSubscriptionRecord {
+  id: string;
+  member: string;
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+  device: string;
+  createdAt: string;
+}
+
 export interface ExtraItem {
   id: string;
   name: string;
@@ -148,30 +257,77 @@ export interface ExtraItem {
   price?: number;
 }
 
-// ── Context type ─────────────────────────────────────────────────────────────
-
-interface DataContextType {
+interface AppState {
+  members: Member[];
   foods: Food[];
+  weeklyMenu: WeeklyMenuItem[];
   chores: Chore[];
   schoolTasks: SchoolTask[];
-  weeklyMenu: WeeklyMenuItem[];
+  familyEvents: FamilyEvent[];
   pointLogs: PointLog[];
   rules: Rule[];
-  members: Member[];
   routines: Routine[];
   products: Product[];
   shoppingNotes: ShoppingNote[];
   routineLogs: string[];
-  points: { [key: string]: number };
+  /** `${fecha}_${choreId}` de cada tarea hecha (historial para hábitos) */
+  choreLogs: string[];
+  /** Desde cuándo hay historial completo de hábitos (YYYY-MM-DD) */
+  habitsSince: string;
+  moodLogs: MoodLog[];
   ingredientItems: IngredientItem[];
   schoolCategories: string[];
   prizes: Prize[];
   prizeRequests: PrizeRequest[];
+  customShoppingItems: CustomShoppingItem[];
+  extraItems: ExtraItem[];
+  foodGroupLimits: Record<string, number>;
+  pushSubscriptions: PushSubscriptionRecord[];
+  calendarFeeds: CalendarFeed[];
+  /** `${miembro}@${lunes}` → lunes de cada semana cuyo menú ya confirmó */
+  menuLocks: Record<string, string>;
+  mealChangeRequests: MealChangeRequest[];
+}
+
+// ── Context type ─────────────────────────────────────────────────────────────
+
+export interface SyncInfo {
+  /** local: sin Firebase configurado */
+  status: 'local' | 'connecting' | 'synced' | 'error';
+  error?: string;
+  during?: 'read' | 'save';
+  at?: string;
+}
+
+interface DataContextType extends Omit<AppState, 'chores'> {
+  chores: Chore[];
+  points: { [key: string]: number };
+  isCloudEnabled: boolean;
+  /** Estado de la sincronización con la nube */
+  sync: SyncInfo;
+  retrySync: () => void;
 
   addFood: (food: Omit<Food, 'id'>) => void;
   updateFood: (id: string, food: Partial<Food>) => void;
   deleteFood: (id: string) => void;
   clearFoods: () => void;
+  setFoodGroupLimit: (group: string, limit: number | null) => void;
+
+  savePushSubscription: (sub: Omit<PushSubscriptionRecord, 'id' | 'createdAt'>) => void;
+  removePushSubscription: (endpoint: string) => void;
+
+  addCalendarFeed: (feed: Omit<CalendarFeed, 'id'>) => void;
+  updateCalendarFeed: (id: string, feed: Partial<CalendarFeed>) => void;
+  deleteCalendarFeed: (id: string) => void;
+
+  /** Menú de una semana (lunes YYYY-MM-DD). `weeklyMenu` es siempre la semana actual */
+  menuOf: (week: string) => WeeklyMenuItem[];
+  isMenuLocked: (member: string, week?: string) => boolean;
+  lockMenu: (member: string, week?: string) => void;
+  unlockMenu: (member: string, week?: string) => void;
+  requestMealChange: (req: Omit<MealChangeRequest, 'id' | 'status' | 'date'>) => void;
+  resolveMealChange: (id: string, approve: boolean) => void;
+  cancelMealChange: (id: string) => void;
 
   addIngredientItem: (item: Omit<IngredientItem, 'id'>) => void;
   deleteIngredientItem: (id: string) => void;
@@ -186,7 +342,8 @@ interface DataContextType {
   addChore: (chore: Omit<Chore, 'id' | 'status'>) => void;
   updateChore: (id: string, chore: Partial<Chore>) => void;
   deleteChore: (id: string) => void;
-  toggleChore: (id: string) => void;
+  /** doneBy: quien la marca (para tareas de 'Familia' los puntos van a ese niño) */
+  toggleChore: (id: string, doneBy?: string) => void;
 
   addRule: (rule: Omit<Rule, 'id'>) => void;
   updateRule: (id: string, rule: Partial<Rule>) => void;
@@ -195,6 +352,7 @@ interface DataContextType {
   addPointLog: (log: Omit<PointLog, 'id' | 'date'>) => void;
   deletePointLog: (id: string) => void;
 
+  addMember: (member: Omit<Member, 'id'>) => void;
   updateMember: (id: string, member: Partial<Member>) => void;
 
   addRoutine: (routine: Omit<Routine, 'id'>) => void;
@@ -202,16 +360,23 @@ interface DataContextType {
   deleteRoutine: (id: string) => void;
   toggleRoutineTask: (routineId: string, taskIndex: number, memberName: string) => void;
 
-  assignMeal: (day: string, meal: string, foodIds: string[], member: string, quantities?: { [fid: string]: number }) => void;
+  assignMeal: (day: string, meal: string, foodIds: string[], member: string, quantities?: { [fid: string]: number }, week?: string) => void;
   toggleAte: (id: string) => void;
-  clearWeeklyMenu: () => void;
+  /** Borra el menú de una semana (por omisión, la actual) */
+  clearWeeklyMenu: (week?: string) => void;
 
   addSchoolTask: (task: Omit<SchoolTask, 'id' | 'completed'>) => void;
   updateSchoolTask: (id: string, task: Partial<SchoolTask>) => void;
   deleteSchoolTask: (id: string) => void;
-  toggleSchoolTask: (id: string) => void;
-
+  toggleSchoolTask: (id: string, byKid?: boolean) => void;
   updateSchoolCategories: (categories: string[]) => void;
+
+  /** Guarda (o borra con null) el ánimo de un miembro en un momento del día de hoy */
+  setMood: (member: string, slot: MoodLog['slot'], mood: string | null) => void;
+
+  addFamilyEvent: (ev: Omit<FamilyEvent, 'id'>) => void;
+  updateFamilyEvent: (id: string, ev: Partial<FamilyEvent>) => void;
+  deleteFamilyEvent: (id: string) => void;
 
   addPrize: (prize: Omit<Prize, 'id'>) => void;
   updatePrize: (id: string, prize: Partial<Prize>) => void;
@@ -220,15 +385,15 @@ interface DataContextType {
   addPrizeRequest: (req: Omit<PrizeRequest, 'id' | 'date' | 'status'>) => void;
   updatePrizeRequest: (id: string, req: Partial<PrizeRequest>) => void;
   deletePrizeRequest: (id: string) => void;
+  /** Aprueba (descuenta puntos) o rechaza un canje */
+  resolvePrizeRequest: (id: string, approve: boolean) => void;
 
-  customShoppingItems: CustomShoppingItem[];
   addCustomShoppingItem: (item: Omit<CustomShoppingItem, 'id' | 'checked' | 'createdAt'>) => void;
   updateCustomShoppingItem: (id: string, item: Partial<CustomShoppingItem>) => void;
   toggleCustomShoppingItem: (id: string) => void;
   deleteCustomShoppingItem: (id: string) => void;
   clearCustomShoppingItems: () => void;
 
-  extraItems: ExtraItem[];
   addExtraItem: (item: Omit<ExtraItem, 'id'>) => void;
   updateExtraItem: (id: string, item: Partial<ExtraItem>) => void;
   deleteExtraItem: (id: string) => void;
@@ -236,268 +401,470 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+const STORAGE_KEY = 'fh_state_v2';
+const ROUTINE_POINTS = 30;
+const PERFECT_DAY_POINTS = 20;
+const SCHOOL_TASK_POINTS = 10;
+
+const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const isWeekly = (freq: string) => /seman/i.test(freq);
+
+const chorePeriodKey = (c: Pick<Chore, 'freq'>, day = todayKey()) => {
+  if (!isWeekly(c.freq)) return day;
+  const [y, m, d] = day.split('-').map(Number);
+  return weekStartKey(new Date(y, m - 1, d));
+};
+
+const isChoreDone = (c: Chore) =>
+  !!c.lastDone && chorePeriodKey(c, c.lastDone) === chorePeriodKey(c);
+
+const cutoffKey = (days: number) => {
+  const d = new Date(); d.setDate(d.getDate() - days);
+  return d.toLocaleDateString('en-CA');
+};
+
+const isKidName = (members: Member[], name: string) =>
+  members.some(m => m.name === name && m.role === 'child');
+
+const seedState = (): AppState => ({
+  members: SEED_MEMBERS,
+  foods: SEED_FOODS,
+  weeklyMenu: [],
+  chores: SEED_CHORES,
+  schoolTasks: [],
+  familyEvents: SEED_EVENTS(),
+  pointLogs: [],
+  rules: SEED_RULES,
+  routines: SEED_ROUTINES,
+  products: SEED_PRODUCTS,
+  shoppingNotes: [],
+  routineLogs: [],
+  choreLogs: [],
+  habitsSince: todayKey(),
+  moodLogs: [],
+  ingredientItems: [],
+  schoolCategories: ['Llevar material', 'Pagar', 'Examen', 'Evento', 'Sin clases', 'Tarea', 'Otro'],
+  prizes: SEED_PRIZES,
+  prizeRequests: [],
+  customShoppingItems: [],
+  extraItems: [],
+  foodGroupLimits: SEED_FOOD_GROUP_LIMITS,
+  pushSubscriptions: [],
+  calendarFeeds: [],
+  menuLocks: {},
+  mealChangeRequests: [],
+});
+
+/** Acepta datos guardados (local o nube) de versiones anteriores y los normaliza */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const normalize = (base: AppState, data: Record<string, any>): AppState => {
+  const next: AppState = { ...base };
+  (Object.keys(base) as (keyof AppState)[]).forEach(k => {
+    if (data[k] !== undefined && data[k] !== null) (next as unknown as Record<string, unknown>)[k] = data[k];
+  });
+  next.members = next.members.map(m => ({
+    ...m,
+    pin: m.pin || (m.role === 'parent' ? '1234' : undefined),
+  }));
+  // Menús de antes de existir semanas: se toman como de la semana actual
+  const thisWeek = weekStartKey();
+  next.weeklyMenu = next.weeklyMenu.map(m => ({ ...m, quantities: m.quantities || {}, week: m.week || thisWeek }));
+  next.menuLocks = Object.fromEntries(Object.entries(next.menuLocks || {}).map(([k, v]) => (k.includes('@') ? [k, v] : [`${k}@${v}`, v])));
+  next.schoolTasks = next.schoolTasks.map(t => {
+    const legacy = t as SchoolTask & { date?: string };
+    return {
+      ...t,
+      eventDate: t.eventDate || legacy.date || '',
+      deadline: t.deadline || t.eventDate || legacy.date || '',
+      category: t.category || 'Otro',
+    };
+  });
+  // Tareas marcadas 'Hecho' antes de existir lastDone: se respetan como hechas hoy
+  next.chores = next.chores.map(c =>
+    c.status === 'Hecho' && !c.lastDone ? { ...c, lastDone: todayKey() } : c,
+  );
+  return next;
+};
+
+const loadLocal = (): AppState => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return normalize(seedState(), JSON.parse(raw));
+  } catch { /* datos corruptos: arrancar con ejemplo */ }
+  return seedState();
+};
+
+const stripUndefined = <T,>(obj: T): T =>
+  JSON.parse(JSON.stringify(obj, (_, v) => (v === undefined ? null : v)));
+
+// ── Provider ─────────────────────────────────────────────────────────────────
+
+/** Mensaje claro para la familia cuando la nube falla */
+const syncErrorText = (err: unknown) => {
+  const code = (err as { code?: string })?.code || '';
+  if (code === 'permission-denied') return 'La nube rechazó los datos. Revisa las reglas de Firestore: deben permitir leer y escribir familyhub/main_state.';
+  if (code === 'unavailable' || code === 'deadline-exceeded') return 'Sin conexión con la nube. Se guarda en este dispositivo y se sube al volver la conexión.';
+  if (code === 'invalid-argument') return 'La nube no aceptó los datos (formato inválido).';
+  if (code === 'resource-exhausted') return 'Se alcanzó el límite de la nube de Firebase.';
+  return (err as Error)?.message || 'No se pudo guardar en la nube.';
+};
+
+const json = (v: unknown) => JSON.stringify(v === undefined ? null : v);
+
 export const DataProvider = ({ children }: { children: ReactNode }) => {
-  const [isCloudLoaded, setIsCloudLoaded] = useState(false);
+  const [state, setState] = useState<AppState>(loadLocal);
+  const [isCloudLoaded, setIsCloudLoaded] = useState(!db);
+  const [sync, setSync] = useState<SyncInfo>({ status: db ? 'connecting' : 'local' });
+  const [retry, setRetry] = useState(0);
+  const [saveTick, setSaveTick] = useState(0);
+  /** Lo último que sabemos que está en la nube, por sección (familyEvents, chores…) */
+  const cloud = useRef<Record<string, string>>({});
+  const inFlight = useRef(false);
 
-  const [members, setMembers] = useState<Member[]>([
-    { id: '1', name: 'Raúl', role: 'parent', avatar: '👨' },
-    { id: '2', name: 'Tania', role: 'parent', avatar: '👩' },
-    { id: '3', name: 'Alan', role: 'child', avatar: '👦' },
-    { id: '4', name: 'Aria', role: 'child', avatar: '👧' },
-  ]);
-  const [foods, setFoods] = useState<Food[]>([]);
-  const [weeklyMenu, setWeeklyMenu] = useState<WeeklyMenuItem[]>([]);
-  const [chores, setChores] = useState<Chore[]>([]);
-  const [schoolTasks, setSchoolTasks] = useState<SchoolTask[]>([]);
-  const [pointLogs, setPointLogs] = useState<PointLog[]>([]);
-  const [rules, setRules] = useState<Rule[]>([
-    { id: '1', description: 'No comer la comida', points: -50, category: 'Comida' },
-    { id: '2', description: 'No sacar la basura', points: -20, category: 'Hogar' },
-    { id: '3', description: 'Ayudar a alguien', points: 30, category: 'Conducta' },
-  ]);
-  const [routines, setRoutines] = useState<Routine[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [shoppingNotes, setShoppingNotes] = useState<ShoppingNote[]>([]);
-  const [routineLogs, setRoutineLogs] = useState<string[]>([]);
-  const [ingredientItems, setIngredientItems] = useState<IngredientItem[]>([]);
-  const [schoolCategories, setSchoolCategories] = useState<string[]>([
-    'Llevar material', 'Pagar', 'Examen', 'Evento', 'Sin clases', 'Tarea', 'Otro',
-  ]);
-  const [prizes, setPrizes] = useState<Prize[]>([]);
-  const [prizeRequests, setPrizeRequests] = useState<PrizeRequest[]>([]);
-  const [customShoppingItems, setCustomShoppingItems] = useState<CustomShoppingItem[]>([]);
-  const [extraItems, setExtraItems] = useState<ExtraItem[]>([]);
-
-  // ── Firebase sync ──────────────────────────────────────────────────────────
-
+  // Escucha cambios en la nube (si Firebase está configurado). Si falla, reintenta.
   useEffect(() => {
-    if (!db) { setIsCloudLoaded(true); return; }
-    const unsub = onSnapshot(doc(db, 'familyhub', 'main_state'), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        if (data.members) setMembers(data.members);
-        if (data.foods) setFoods(data.foods);
-        if (data.weeklyMenu) {
-          setWeeklyMenu(data.weeklyMenu.map((m: any) => ({
-            ...m,
-            quantities: m.quantities || {},
-          })));
+    if (!db) return;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    const unsub = onSnapshot(
+      doc(db, 'familyhub', 'main_state'),
+      (snap) => {
+        if (snap.metadata.hasPendingWrites) return; // eco de nuestra propia escritura
+        if (snap.exists()) {
+          const data = snap.data();
+          Object.keys(data).forEach(k => { cloud.current[k] = json(stripUndefined(data[k])); });
+          setState(prev => normalize(prev, data));
         }
-        if (data.chores) setChores(data.chores);
-        if (data.schoolTasks) {
-          setSchoolTasks(data.schoolTasks.map((t: any) => ({
-            ...t,
-            eventDate: t.eventDate || t.date || '',
-            deadline: t.deadline || t.eventDate || t.date || '',
-            category: t.category || 'Otro',
-          })));
-        }
-        if (data.pointLogs) setPointLogs(data.pointLogs);
-        if (data.rules) setRules(data.rules);
-        if (data.routines) setRoutines(data.routines);
-        if (data.products) setProducts(data.products);
-        if (data.shoppingNotes) setShoppingNotes(data.shoppingNotes);
-        if (data.routineLogs) setRoutineLogs(data.routineLogs);
-        if (data.ingredientItems) setIngredientItems(data.ingredientItems);
-        if (data.schoolCategories) setSchoolCategories(data.schoolCategories);
-        if (data.prizes) setPrizes(data.prizes);
-        if (data.prizeRequests) setPrizeRequests(data.prizeRequests);
-        if (data.customShoppingItems) setCustomShoppingItems(data.customShoppingItems);
-        if (data.extraItems) setExtraItems(data.extraItems);
-      }
-      setIsCloudLoaded(true);
-    });
-    return () => unsub();
-  }, []);
+        setIsCloudLoaded(true);
+        setSync(s => (s.status === 'error' && s.during === 'save' ? s : { status: 'synced', at: new Date().toISOString() }));
+      },
+      (err) => {
+        console.error('Firestore no disponible, se usa modo local', err);
+        setIsCloudLoaded(true);
+        setSync({ status: 'error', error: syncErrorText(err), during: 'read' });
+        retryTimer = setTimeout(() => setRetry(r => r + 1), 30000);
+      },
+    );
+    return () => { unsub(); if (retryTimer) clearTimeout(retryTimer); };
+  }, [retry]);
 
-  const sanitize = (obj: any): any =>
-    JSON.parse(JSON.stringify(obj, (_, v) => (v === undefined ? null : v)));
-
+  // Persiste localmente siempre, y en la nube solo las secciones que cambiaron
+  // (así un dispositivo no borra lo que otro guardó en otra sección)
   useEffect(() => {
-    if (!isCloudLoaded) return;
-    if (db) {
-      const payload = sanitize({
-        members, foods, weeklyMenu, chores, schoolTasks, pointLogs, rules,
-        routines, products, shoppingNotes, routineLogs, ingredientItems,
-        schoolCategories, prizes, prizeRequests, customShoppingItems, extraItems,
+    const payload = stripUndefined(state);
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)); } catch { /* almacenamiento lleno o bloqueado */ }
+    if (!db || !isCloudLoaded || inFlight.current) return;
+    const changed = (Object.keys(payload) as (keyof AppState)[]).filter(k => json(payload[k]) !== cloud.current[k]);
+    if (changed.length === 0) return;
+    const part: Record<string, unknown> = {};
+    changed.forEach(k => { part[k] = payload[k] ?? null; });
+    inFlight.current = true;
+    let ok = false;
+    setDoc(doc(db, 'familyhub', 'main_state'), part, { mergeFields: changed as string[] })
+      .then(() => {
+        ok = true;
+        changed.forEach(k => { cloud.current[k] = json(part[k]); });
+        setSync({ status: 'synced', at: new Date().toISOString() });
+      })
+      .catch(err => {
+        console.error('No se pudo guardar en la nube', err);
+        setSync({ status: 'error', error: syncErrorText(err), during: 'save' });
+      })
+      .finally(() => {
+        inFlight.current = false;
+        // Revisa si hubo cambios mientras se guardaba; si falló, reintenta en 20 s
+        if (ok) setSaveTick(t => t + 1);
+        else setTimeout(() => setSaveTick(t => t + 1), 20000);
       });
-      setDoc(doc(db, 'familyhub', 'main_state'), payload, { merge: true }).catch(console.error);
-    }
-  }, [
-    members, foods, weeklyMenu, chores, schoolTasks, pointLogs, rules,
-    routines, products, shoppingNotes, routineLogs, ingredientItems,
-    schoolCategories, prizes, prizeRequests, customShoppingItems, extraItems, isCloudLoaded,
-  ]);
+  }, [state, isCloudLoaded, saveTick]);
+
+  // ── Helpers de actualización ───────────────────────────────────────────────
+
+  const patch = (fn: (s: AppState) => Partial<AppState>) =>
+    setState(s => ({ ...s, ...fn(s) }));
+
+  type ListKey = {
+    [K in keyof AppState]: AppState[K] extends { id: string }[] ? K : never
+  }[keyof AppState];
+
+  const addTo = <K extends ListKey>(key: K, item: Omit<AppState[K][number], 'id'>) =>
+    patch(s => ({ [key]: [...s[key], { ...item, id: uid() }] }) as Partial<AppState>);
+  const updateIn = <K extends ListKey>(key: K, id: string, changes: Partial<AppState[K][number]>) =>
+    patch(s => ({ [key]: (s[key] as { id: string }[]).map(x => (x.id === id ? { ...x, ...changes } : x)) }) as Partial<AppState>);
+  const removeFrom = <K extends ListKey>(key: K, id: string) =>
+    patch(s => ({ [key]: (s[key] as { id: string }[]).filter(x => x.id !== id) }) as Partial<AppState>);
+
+  const newLog = (l: Omit<PointLog, 'id' | 'date'>): PointLog =>
+    ({ ...l, id: uid(), date: new Date().toISOString() });
 
   // ── Computed ───────────────────────────────────────────────────────────────
 
-  const points = members.reduce((acc, m) => {
-    acc[m.name] = pointLogs
+  const chores = state.chores.map(c => ({ ...c, status: isChoreDone(c) ? 'Hecho' : 'Pendiente' } as Chore));
+
+  const points = state.members.reduce((acc, m) => {
+    acc[m.name] = state.pointLogs
       .filter(l => l.member === m.name)
       .reduce((sum, l) => sum + l.points, 0);
     return acc;
   }, {} as { [key: string]: number });
 
-  // ── CRUD ───────────────────────────────────────────────────────────────────
+  // ── Acciones con lógica ────────────────────────────────────────────────────
 
-  const addFood = (f: Omit<Food, 'id'>) =>
-    setFoods(prev => [...prev, { ...f, id: `${Date.now()}-${Math.random().toString(36).slice(2)}` }]);
-  const updateFood = (id: string, f: Partial<Food>) =>
-    setFoods(foods.map(x => (x.id === id ? { ...x, ...f } as Food : x)));
-  const deleteFood = (id: string) => setFoods(foods.filter(x => x.id !== id));
-  const clearFoods = () => { setFoods([]); setIngredientItems([]); };
+  const toggleChore = (id: string, doneBy?: string) => patch(s => {
+    const chore = s.chores.find(c => c.id === id);
+    if (!chore) return {};
+    const key = `chore_${id}_${chorePeriodKey(chore)}`;
+    const logKey = `${chore.lastDone || todayKey()}_${id}`;
+    if (isChoreDone(chore)) {
+      return {
+        chores: s.chores.map(c => (c.id === id ? { ...c, lastDone: undefined, doneBy: undefined } : c)),
+        pointLogs: s.pointLogs.filter(l => l.sourceKey !== key),
+        choreLogs: s.choreLogs.filter(l => l !== logKey),
+      };
+    }
+    const cutoff = cutoffKey(90);
+    const choreLogs = [...s.choreLogs.filter(l => l.slice(0, 10) >= cutoff), `${todayKey()}_${id}`];
+    const earner = isKidName(s.members, chore.user)
+      ? chore.user
+      : doneBy && isKidName(s.members, doneBy) ? doneBy : null;
+    const alreadyLogged = s.pointLogs.some(l => l.sourceKey === key);
+    return {
+      chores: s.chores.map(c => (c.id === id ? { ...c, lastDone: todayKey(), doneBy } : c)),
+      choreLogs,
+      pointLogs: earner && !alreadyLogged
+        ? [...s.pointLogs, newLog({ member: earner, description: `Tarea: ${chore.name}`, points: chore.points, sourceKey: key })]
+        : s.pointLogs,
+    };
+  });
 
-  const addIngredientItem = (item: Omit<IngredientItem, 'id'>) =>
-    setIngredientItems([...ingredientItems, { ...item, id: Date.now().toString() }]);
-  const deleteIngredientItem = (id: string) =>
-    setIngredientItems(ingredientItems.filter(x => x.id !== id));
+  const toggleRoutineTask = (rid: string, idx: number, memberName: string) => patch(s => {
+    const today = todayKey();
+    const key = `${today}_${rid}_${idx}`;
+    const routine = s.routines.find(r => r.id === rid);
+    const routineLogs = s.routineLogs.includes(key)
+      ? s.routineLogs.filter(x => x !== key)
+      : [...s.routineLogs, key];
+    if (!routine) return { routineLogs };
 
-  const addProduct = (p: Omit<Product, 'id'>) =>
-    setProducts([...products, { ...p, id: Date.now().toString() }]);
-  const updateProduct = (id: string, p: Partial<Product>) =>
-    setProducts(products.map(x => (x.id === id ? { ...x, ...p } as Product : x)));
-  const deleteProduct = (id: string) => setProducts(products.filter(x => x.id !== id));
+    const isComplete = (r: Routine, logs: string[]) =>
+      r.tasks.length > 0 && r.tasks.every((_, i) => logs.includes(`${today}_${r.id}_${i}`));
 
-  const addChore = (c: Omit<Chore, 'id' | 'status'>) =>
-    setChores([...chores, { ...c, id: Date.now().toString(), status: 'Pendiente' }]);
-  const updateChore = (id: string, c: Partial<Chore>) =>
-    setChores(chores.map(x => (x.id === id ? { ...x, ...c } as Chore : x)));
-  const deleteChore = (id: string) => setChores(chores.filter(x => x.id !== id));
-  const toggleChore = (id: string) => {
-    setChores(chores.map(c => {
-      if (c.id !== id) return c;
-      const isDone = c.status === 'Pendiente';
-      if (isDone && !['Raúl', 'Tania', 'Familia'].includes(c.user)) {
-        addPointLog({ member: c.user, description: `Tarea: ${c.name}`, points: c.points });
-      }
-      return { ...c, status: isDone ? 'Hecho' : 'Pendiente' };
-    }));
-  };
+    const routineKey = `routine_${today}_${rid}`;
+    const perfectKey = `perfect_${today}_${memberName}`;
+    let pointLogs = s.pointLogs.filter(l => l.sourceKey !== routineKey && l.sourceKey !== perfectKey);
+    const prevRoutineLog = s.pointLogs.find(l => l.sourceKey === routineKey);
+    const prevPerfectLog = s.pointLogs.find(l => l.sourceKey === perfectKey);
 
-  const addRule = (r: Omit<Rule, 'id'>) =>
-    setRules([...rules, { ...r, id: Date.now().toString() }]);
-  const updateRule = (id: string, r: Partial<Rule>) =>
-    setRules(rules.map(x => (x.id === id ? { ...x, ...r } as Rule : x)));
-  const deleteRule = (id: string) => setRules(rules.filter(x => x.id !== id));
+    if (isComplete(routine, routineLogs)) {
+      pointLogs.push(prevRoutineLog || newLog({ member: memberName, description: `Rutina: ${routine.name}`, points: ROUTINE_POINTS, sourceKey: routineKey }));
+    }
+    const mine = s.routines.filter(r => r.member === memberName && r.tasks.length > 0);
+    if (mine.length > 1 && mine.every(r => isComplete(r, routineLogs))) {
+      pointLogs.push(prevPerfectLog || newLog({ member: memberName, description: '¡Día perfecto! Todas las rutinas', points: PERFECT_DAY_POINTS, sourceKey: perfectKey }));
+    }
+    // Solo niños ganan puntos
+    if (!isKidName(s.members, memberName)) pointLogs = s.pointLogs;
+    // Limpia registros de rutinas de más de 90 días
+    const cutoff = cutoffKey(90);
+    return { routineLogs: routineLogs.filter(k => k.slice(0, 10) >= cutoff), pointLogs };
+  });
 
-  const addPointLog = (l: Omit<PointLog, 'id' | 'date'>) =>
-    setPointLogs([...pointLogs, { ...l, id: Date.now().toString(), date: new Date().toISOString() }]);
-  const deletePointLog = (id: string) =>
-    setPointLogs(pointLogs.filter(x => x.id !== id));
-
-  const updateMember = (id: string, m: Partial<Member>) =>
-    setMembers(members.map(item => (item.id === id ? { ...item, ...m } as Member : item)));
-
-  const addRoutine = (r: Omit<Routine, 'id'>) =>
-    setRoutines([...routines, { ...r, id: Date.now().toString() }]);
-  const updateRoutine = (id: string, r: Partial<Routine>) =>
-    setRoutines(routines.map(x => (x.id === id ? { ...x, ...r } as Routine : x)));
-  const deleteRoutine = (id: string) => setRoutines(routines.filter(x => x.id !== id));
-
-  const toggleRoutineTask = (rid: string, idx: number, mName: string) => {
-    const todayStr = new Date().toLocaleDateString('en-CA');
-    const key = `${todayStr}_${rid}_${idx}`;
-    setRoutineLogs(prev => {
-      if (prev.includes(key)) return prev.filter(x => x !== key);
-      const next = [...prev, key];
-      const routine = routines.find(r => r.id === rid);
-      if (routine) {
-        const done = next.filter(k => k.startsWith(`${todayStr}_${rid}_`)).length;
-        if (done === routine.tasks.length) {
-          addPointLog({ member: mName, description: `Rutina: ${routine.name}`, points: 30 });
-        }
-      }
-      return next;
-    });
-  };
+  const toggleSchoolTask = (id: string, byKid = false) => patch(s => {
+    const task = s.schoolTasks.find(t => t.id === id);
+    if (!task) return {};
+    const key = `school_${id}`;
+    const completed = !task.completed;
+    let pointLogs = s.pointLogs.filter(l => l.sourceKey !== key);
+    if (completed && byKid && isKidName(s.members, task.child)) {
+      pointLogs = [...pointLogs, newLog({ member: task.child, description: `Escuela: ${task.title}`, points: SCHOOL_TASK_POINTS, sourceKey: key })];
+    }
+    return {
+      schoolTasks: s.schoolTasks.map(t => (t.id === id ? { ...t, completed } : t)),
+      pointLogs,
+    };
+  });
 
   const assignMeal = (
-    d: string,
-    m: string,
-    ids: string[],
-    mem: string,
-    quantities: { [fid: string]: number } = {},
-  ) => {
-    setWeeklyMenu(prev => {
-      const filtered = prev.filter(x => !(x.day === d && x.meal === m && x.member === mem));
-      if (!ids.length) return filtered;
-      return [...filtered, { id: Date.now().toString(), day: d, meal: m, foodIds: ids, quantities, member: mem, ate: false }];
-    });
-  };
-  const toggleAte = (id: string) =>
-    setWeeklyMenu(weeklyMenu.map(x => (x.id === id ? { ...x, ate: !x.ate } : x)));
-  const clearWeeklyMenu = () => setWeeklyMenu([]);
+    d: string, m: string, ids: string[], mem: string,
+    quantities: { [fid: string]: number } = {}, week = weekStartKey(),
+  ) => patch(s => {
+    // Se guardan la semana pasada, la actual y la siguiente
+    const lastWeek = new Date(); lastWeek.setDate(lastWeek.getDate() - 7);
+    const oldest = weekStartKey(lastWeek);
+    const filtered = s.weeklyMenu.filter(x => (x.week || '') >= oldest && !(x.week === week && x.day === d && x.meal === m && x.member === mem));
+    if (!ids.length) return { weeklyMenu: filtered };
+    return { weeklyMenu: [...filtered, { id: uid(), week, day: d, meal: m, foodIds: ids, quantities, member: mem, ate: false }] };
+  });
 
-  const addSchoolTask = (t: Omit<SchoolTask, 'id' | 'completed'>) =>
-    setSchoolTasks(prev => [...prev, { ...t, id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, completed: false }]);
-  const updateSchoolTask = (id: string, t: Partial<SchoolTask>) =>
-    setSchoolTasks(schoolTasks.map(x => (x.id === id ? { ...x, ...t } as SchoolTask : x)));
-  const deleteSchoolTask = (id: string) =>
-    setSchoolTasks(schoolTasks.filter(x => x.id !== id));
-  const toggleSchoolTask = (id: string) =>
-    setSchoolTasks(schoolTasks.map(x => (x.id === id ? { ...x, completed: !x.completed } : x)));
+  const currentWeek = weekStartKey();
+  const menuOf = (week: string) => state.weeklyMenu.filter(w => (w.week || currentWeek) === week);
 
-  const updateSchoolCategories = (cats: string[]) => setSchoolCategories(cats);
-
-  const addPrize = (p: Omit<Prize, 'id'>) =>
-    setPrizes([...prizes, { ...p, id: Date.now().toString() }]);
-  const updatePrize = (id: string, p: Partial<Prize>) =>
-    setPrizes(prizes.map(x => (x.id === id ? { ...x, ...p } as Prize : x)));
-  const deletePrize = (id: string) => setPrizes(prizes.filter(x => x.id !== id));
-
-  const addPrizeRequest = (req: Omit<PrizeRequest, 'id' | 'date' | 'status'>) =>
-    setPrizeRequests([...prizeRequests, { ...req, id: Date.now().toString(), date: new Date().toISOString(), status: 'pending' }]);
-  const updatePrizeRequest = (id: string, req: Partial<PrizeRequest>) =>
-    setPrizeRequests(prizeRequests.map(x => (x.id === id ? { ...x, ...req } as PrizeRequest : x)));
-  const deletePrizeRequest = (id: string) =>
-    setPrizeRequests(prizeRequests.filter(x => x.id !== id));
-
-  const addCustomShoppingItem = (item: Omit<CustomShoppingItem, 'id' | 'checked' | 'createdAt'>) =>
-    setCustomShoppingItems(prev => [...prev, { ...item, id: Date.now().toString(), checked: false, createdAt: new Date().toISOString() }]);
-  const updateCustomShoppingItem = (id: string, item: Partial<CustomShoppingItem>) =>
-    setCustomShoppingItems(prev => prev.map(x => x.id === id ? { ...x, ...item } : x));
-  const toggleCustomShoppingItem = (id: string) =>
-    setCustomShoppingItems(prev => prev.map(x => x.id === id ? { ...x, checked: !x.checked } : x));
-  const deleteCustomShoppingItem = (id: string) =>
-    setCustomShoppingItems(prev => prev.filter(x => x.id !== id));
-  const clearCustomShoppingItems = () => setCustomShoppingItems([]);
-
-  const addExtraItem = (item: Omit<ExtraItem, 'id'>) =>
-    setExtraItems(prev => [...prev, { ...item, id: `${Date.now()}-${Math.random().toString(36).slice(2)}` }]);
-  const updateExtraItem = (id: string, item: Partial<ExtraItem>) =>
-    setExtraItems(prev => prev.map(x => x.id === id ? { ...x, ...item } : x));
-  const deleteExtraItem = (id: string) =>
-    setExtraItems(prev => prev.filter(x => x.id !== id));
+  const setFoodGroupLimit = (group: string, limit: number | null) => patch(s => {
+    const next = { ...s.foodGroupLimits };
+    if (limit === null || Number.isNaN(limit)) delete next[group];
+    else next[group] = limit;
+    return { foodGroupLimits: next };
+  });
 
   return (
     <DataContext.Provider value={{
-      foods, chores, schoolTasks, weeklyMenu, pointLogs, rules, members, routines,
-      products, shoppingNotes, points, routineLogs, ingredientItems, schoolCategories,
-      prizes, prizeRequests,
-      addFood, updateFood, deleteFood, clearFoods,
-      addIngredientItem, deleteIngredientItem,
-      addProduct, updateProduct, deleteProduct,
-      addShoppingNote: (t) => setShoppingNotes([...shoppingNotes, { id: Date.now().toString(), text: t, createdAt: new Date().toISOString() }]),
-      deleteShoppingNote: (id) => setShoppingNotes(shoppingNotes.filter(x => x.id !== id)),
-      addChore, updateChore, deleteChore, toggleChore,
-      addRule, updateRule, deleteRule,
-      addPointLog, deletePointLog,
-      updateMember,
-      addRoutine, updateRoutine, deleteRoutine, toggleRoutineTask,
-      assignMeal, toggleAte, clearWeeklyMenu,
-      addSchoolTask, updateSchoolTask, deleteSchoolTask, toggleSchoolTask,
-      updateSchoolCategories,
-      addPrize, updatePrize, deletePrize,
-      addPrizeRequest, updatePrizeRequest, deletePrizeRequest,
-      customShoppingItems,
-      addCustomShoppingItem, updateCustomShoppingItem, toggleCustomShoppingItem, deleteCustomShoppingItem, clearCustomShoppingItems,
-      extraItems, addExtraItem, updateExtraItem, deleteExtraItem,
+      ...state,
+      weeklyMenu: menuOf(currentWeek),
+      chores,
+      points,
+      isCloudEnabled: !!db,
+      sync,
+      retrySync: () => { setRetry(r => r + 1); setSaveTick(t => t + 1); },
+
+      addFood: (f) => addTo('foods', f),
+      updateFood: (id, f) => updateIn('foods', id, f),
+      deleteFood: (id) => removeFrom('foods', id),
+      clearFoods: () => patch(() => ({ foods: [], ingredientItems: [] })),
+      setFoodGroupLimit,
+
+      savePushSubscription: (sub) => patch(s => ({
+        pushSubscriptions: [
+          ...s.pushSubscriptions.filter(p => p.endpoint !== sub.endpoint),
+          { ...sub, id: uid(), createdAt: new Date().toISOString() },
+        ],
+      })),
+      removePushSubscription: (endpoint) => patch(s => ({
+        pushSubscriptions: s.pushSubscriptions.filter(p => p.endpoint !== endpoint),
+      })),
+
+      addCalendarFeed: (f) => addTo('calendarFeeds', f),
+      updateCalendarFeed: (id, f) => updateIn('calendarFeeds', id, f),
+      deleteCalendarFeed: (id) => removeFrom('calendarFeeds', id),
+
+      menuOf,
+      isMenuLocked: (member, week = currentWeek) => !!state.menuLocks[`${member}@${week}`],
+      lockMenu: (member, week = weekStartKey()) => patch(s => ({ menuLocks: { ...s.menuLocks, [`${member}@${week}`]: week } })),
+      unlockMenu: (member, week = weekStartKey()) => patch(s => {
+        const next = { ...s.menuLocks }; delete next[`${member}@${week}`];
+        return { menuLocks: next };
+      }),
+      requestMealChange: (r) => patch(s => ({
+        mealChangeRequests: [
+          // Una sola solicitud pendiente por comida
+          ...s.mealChangeRequests.filter(x => !(x.status === 'pending' && x.member === r.member && x.day === r.day && x.meal === r.meal)),
+          { ...r, id: uid(), status: 'pending', date: new Date().toISOString() },
+        ],
+      })),
+      resolveMealChange: (id, approve) => patch(s => {
+        const req = s.mealChangeRequests.find(r => r.id === id);
+        if (!req || req.status !== 'pending') return {};
+        const requests = s.mealChangeRequests.map(r => (r.id === id ? { ...r, status: approve ? 'approved' as const : 'rejected' as const } : r));
+        if (!approve) return { mealChangeRequests: requests };
+        const wk = req.week || weekStartKey();
+        const same = (w: WeeklyMenuItem, day: string) => (w.week || wk) === wk && w.day === day && w.meal === req.meal && w.member === req.member;
+        const find = (day: string) => s.weeklyMenu.find(w => same(w, day));
+        const without = (list: WeeklyMenuItem[], day: string) => list.filter(w => !same(w, day));
+        const slot = (day: string, foodIds: string[], quantities: Record<string, number>): WeeklyMenuItem[] =>
+          foodIds.length ? [{ id: uid(), week: wk, day, meal: req.meal, member: req.member, foodIds, quantities, ate: false }] : [];
+        let weeklyMenu = without(s.weeklyMenu, req.day);
+        if (req.kind === 'swap' && req.swapDay) {
+          const a = find(req.day); const b = find(req.swapDay);
+          weeklyMenu = without(weeklyMenu, req.swapDay);
+          weeklyMenu = [...weeklyMenu, ...slot(req.day, b?.foodIds || [], b?.quantities || {}), ...slot(req.swapDay, a?.foodIds || [], a?.quantities || {})];
+        } else {
+          weeklyMenu = [...weeklyMenu, ...slot(req.day, req.foodIds || [], req.quantities || {})];
+        }
+        return { mealChangeRequests: requests, weeklyMenu };
+      }),
+      cancelMealChange: (id) => removeFrom('mealChangeRequests', id),
+
+      addIngredientItem: (i) => addTo('ingredientItems', i),
+      deleteIngredientItem: (id) => removeFrom('ingredientItems', id),
+
+      addProduct: (p) => addTo('products', p),
+      updateProduct: (id, p) => updateIn('products', id, p),
+      deleteProduct: (id) => removeFrom('products', id),
+
+      addShoppingNote: (text) => addTo('shoppingNotes', { text, createdAt: new Date().toISOString() }),
+      deleteShoppingNote: (id) => removeFrom('shoppingNotes', id),
+
+      addChore: (c) => addTo('chores', { ...c, status: 'Pendiente', since: todayKey() }),
+      updateChore: (id, c) => updateIn('chores', id, c),
+      deleteChore: (id) => removeFrom('chores', id),
+      toggleChore,
+
+      addRule: (r) => addTo('rules', r),
+      updateRule: (id, r) => updateIn('rules', id, r),
+      deleteRule: (id) => removeFrom('rules', id),
+
+      addPointLog: (l) => patch(s => ({ pointLogs: [...s.pointLogs, newLog(l)] })),
+      deletePointLog: (id) => removeFrom('pointLogs', id),
+
+      addMember: (m) => addTo('members', m),
+      updateMember: (id, m) => updateIn('members', id, m),
+
+      addRoutine: (r) => addTo('routines', { ...r, since: todayKey() }),
+      updateRoutine: (id, r) => updateIn('routines', id, r),
+      deleteRoutine: (id) => removeFrom('routines', id),
+      toggleRoutineTask,
+
+      assignMeal,
+      toggleAte: (id) => patch(s => ({ weeklyMenu: s.weeklyMenu.map(x => (x.id === id ? { ...x, ate: !x.ate } : x)) })),
+      clearWeeklyMenu: (week = weekStartKey()) => patch(s => ({
+        weeklyMenu: s.weeklyMenu.filter(w => (w.week || week) !== week),
+        menuLocks: Object.fromEntries(Object.entries(s.menuLocks).filter(([, v]) => v !== week)),
+        mealChangeRequests: s.mealChangeRequests.filter(r => (r.week || weekStartKey()) !== week),
+      })),
+
+      addSchoolTask: (t) => addTo('schoolTasks', { ...t, completed: false }),
+      updateSchoolTask: (id, t) => updateIn('schoolTasks', id, t),
+      deleteSchoolTask: (id) => removeFrom('schoolTasks', id),
+      toggleSchoolTask,
+      updateSchoolCategories: (cats) => patch(() => ({ schoolCategories: cats })),
+
+      setMood: (member, slot, mood) => patch(s => {
+        const date = todayKey();
+        const cutoff = cutoffKey(120);
+        const rest = s.moodLogs.filter(l => l.date >= cutoff && !(l.member === member && l.date === date && l.slot === slot));
+        return { moodLogs: mood ? [...rest, { id: uid(), member, date, slot, mood, at: new Date().toISOString() }] : rest };
+      }),
+
+      addFamilyEvent: (e) => addTo('familyEvents', e),
+      updateFamilyEvent: (id, e) => updateIn('familyEvents', id, e),
+      deleteFamilyEvent: (id) => removeFrom('familyEvents', id),
+
+      addPrize: (p) => addTo('prizes', p),
+      updatePrize: (id, p) => updateIn('prizes', id, p),
+      deletePrize: (id) => removeFrom('prizes', id),
+
+      addPrizeRequest: (r) => addTo('prizeRequests', { ...r, date: new Date().toISOString(), status: 'pending' }),
+      updatePrizeRequest: (id, r) => updateIn('prizeRequests', id, r),
+      deletePrizeRequest: (id) => removeFrom('prizeRequests', id),
+      resolvePrizeRequest: (id, approve) => patch(s => {
+        const req = s.prizeRequests.find(r => r.id === id);
+        if (!req || req.status !== 'pending') return {};
+        const prize = s.prizes.find(p => p.id === req.prizeId);
+        return {
+          prizeRequests: s.prizeRequests.map(r => (r.id === id ? { ...r, status: approve ? 'approved' : 'rejected' } : r)),
+          pointLogs: approve && prize
+            ? [...s.pointLogs, newLog({ member: req.member, description: `Canje: ${prize.name}`, points: -prize.points, sourceKey: `prize_${id}` })]
+            : s.pointLogs,
+        };
+      }),
+
+      addCustomShoppingItem: (i) => addTo('customShoppingItems', { ...i, checked: false, createdAt: new Date().toISOString() }),
+      updateCustomShoppingItem: (id, i) => updateIn('customShoppingItems', id, i),
+      toggleCustomShoppingItem: (id) => patch(s => ({ customShoppingItems: s.customShoppingItems.map(x => (x.id === id ? { ...x, checked: !x.checked } : x)) })),
+      deleteCustomShoppingItem: (id) => removeFrom('customShoppingItems', id),
+      clearCustomShoppingItems: () => patch(() => ({ customShoppingItems: [] })),
+
+      addExtraItem: (i) => addTo('extraItems', i),
+      updateExtraItem: (id, i) => updateIn('extraItems', id, i),
+      deleteExtraItem: (id) => removeFrom('extraItems', id),
     }}>
       {children}
     </DataContext.Provider>
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useData = () => {
   const context = useContext(DataContext);
   if (!context) throw new Error('useData must be used within DataProvider');
