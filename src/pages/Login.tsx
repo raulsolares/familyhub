@@ -78,7 +78,7 @@ const Login = () => {
               <p className="login-section" style={{ marginTop: '1.25rem' }}>Niños</p>
               <div className="login-grid">{kids.map(m => tile(m, true))}</div>
               {kids.length > 1 && kids.every(k => !k.pin) && (
-                <button className="login-duo" onClick={() => { login(kids[0]); navigate('/duel'); }}>
+                <button className="login-duo" onClick={() => { login(kids[0]); setTimeout(() => navigate('/duel', { replace: true }), 0); }}>
                   👥 Cabina doble <small>({kids.map(k => k.name).join(' y ')} en la misma pantalla)</small>
                 </button>
               )}

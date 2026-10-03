@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { UserPlus, Shield, Clock, Trash2, Edit2, List, X, Save, Bell, Sun, Moon } from 'lucide-react';
+import { UserPlus, Shield, Trash2, Edit2, X, Save, Bell, Sun, Moon } from 'lucide-react';
 import NotificationSettings from '../components/NotificationSettings';
 import { useData } from '../context/DataContext';
 import { useUser } from '../context/UserContext';
-import type { Member, Rule, Routine, Chore } from '../context/DataContext';
+import type { Member, Rule } from '../context/DataContext';
 
 const AVATARS = ['👦', '👧', '🧒', '👶', '👨', '👩', '🧔', '👱‍♀️', '👴', '👵', '🦸', '🧚', '🐶', '🐱', '🦄', '🐼'];
 
@@ -12,13 +12,12 @@ const Settings = () => {
   const { updateTheme, user } = useUser();
   const theme = user?.theme;
   const { 
-    members, routines, chores, rules,
-    addRule, deleteRule, 
-    addRoutine, deleteRoutine, 
-    addChore, deleteChore, updateMember, addMember,
+    members, rules,
+    addRule, deleteRule,
+    updateMember, addMember,
   } = useData();
 
-  type Tab = 'members' | 'rules' | 'routines' | 'chores' | 'notifications';
+  type Tab = 'members' | 'rules' | 'notifications';
   const [activeTab, setActiveTab] = useState<Tab>('members');
 
   // Miembros
@@ -48,30 +47,10 @@ const Settings = () => {
     setShowMemberForm(false);
   };
 
-  // States for Routines
-  const [showRoutineForm, setShowRoutineForm] = useState(false);
-  const [rName, setRName] = useState('');
-  const [rTime, setRTime] = useState('08:00');
-  const [rMember, setRMember] = useState('Alan');
-  const [rIcon] = useState('☀️');
-  const [rTasks, setRTasks] = useState<string[]>(['']);
-
   // States for Rules
   const [showRuleForm, setShowRuleForm] = useState(false);
   const [ruleDesc, setRuleDesc] = useState('');
   const [rulePoints, setRulePoints] = useState(0);
-
-  // States for Chores
-  const [showChoreForm, setShowChoreForm] = useState(false);
-  const [cName, setCName] = useState('');
-  const [cUser, setCUser] = useState('Alan');
-  const [cPoints, setCPoints] = useState(20);
-
-  const handleRoutineSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    addRoutine({ name: rName, time: rTime, member: rMember, icon: rIcon, tasks: rTasks.filter(t => t.trim() !== '') });
-    setRName(''); setRTasks(['']); setShowRoutineForm(false);
-  };
 
   const handleRuleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -79,23 +58,12 @@ const Settings = () => {
     setRuleDesc(''); setRulePoints(0); setShowRuleForm(false);
   };
 
-  const handleChoreSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    addChore({ name: cName, user: cUser, points: cPoints, freq: 'Diario' });
-    setCName(''); setShowChoreForm(false);
-  };
-
-  const addRTaskRow = () => setRTasks([...rTasks, '']);
-  const updateRTaskRow = (idx: number, val: string) => {
-    const next = [...rTasks]; next[idx] = val; setRTasks(next);
-  };
-
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
       <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '1rem', flexWrap: 'wrap' }}>
         <div>
           <h1 className="page-title">Configuración</h1>
-          <p className="page-subtitle">Familia, retos, rutinas, tareas y notificaciones</p>
+          <p className="page-subtitle">Familia, retos y notificaciones. Rutinas y tareas se editan en su propia sección.</p>
         </div>
         <div className="seg" role="group" aria-label="Tema">
           <button className={theme !== 'dark' ? 'on' : ''} onClick={() => updateTheme('light')}><Sun size={13} style={{ verticalAlign: '-2px' }} /> Claro</button>
@@ -107,8 +75,6 @@ const Settings = () => {
         {[
           { id: 'members', label: 'Familia', icon: UserPlus },
           { id: 'rules', label: 'Retos y logros', icon: Shield },
-          { id: 'routines', label: 'Rutinas', icon: Clock },
-          { id: 'chores', label: 'Tareas del hogar', icon: List },
           { id: 'notifications', label: 'Notificaciones', icon: Bell },
         ].map(tab => (
           <button key={tab.id} role="tab" aria-selected={activeTab === tab.id} className={`member-tab${activeTab === tab.id ? ' on' : ''}`} onClick={() => setActiveTab(tab.id as Tab)}>
@@ -183,71 +149,6 @@ const Settings = () => {
         </div>
       )}
 
-      {/* Rutinas */}
-      {activeTab === 'routines' && (
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-             <h3 className="card-title">Bloques de Rutina por Miembro</h3>
-             <button onClick={() => setShowRoutineForm(true)} className="btn-primary">+ Crear Bloque</button>
-          </div>
-
-          {showRoutineForm && (
-            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-              <div className="card" style={{ width: '100%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-                   <h3 style={{ fontWeight: '900' }}>Nueva Rutina</h3>
-                   <button onClick={() => setShowRoutineForm(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X/></button>
-                </div>
-                <form onSubmit={handleRoutineSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                    <div><label style={{ fontSize: '0.8rem', fontWeight: '800' }}>Miembro</label>
-                      <select value={rMember} onChange={e => setRMember(e.target.value)} style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                        {members.map((m: Member) => <option key={m.id} value={m.name}>{m.name}</option>)}
-                      </select>
-                    </div>
-                    <div><label style={{ fontSize: '0.8rem', fontWeight: '800' }}>Hora Inicio</label><input type="time" value={rTime} onChange={e => setRTime(e.target.value)} style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--border)' }} /></div>
-                  </div>
-                  <div><label style={{ fontSize: '0.8rem', fontWeight: '800' }}>Nombre Rutina</label><input required value={rName} onChange={e => setRName(e.target.value)} placeholder="Ej: Mañana, Escuela..." style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--border)' }} /></div>
-                  
-                  <div>
-                    <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: '800', marginBottom: '0.5rem' }}>Tareas de la Rutina <button type="button" onClick={addRTaskRow} style={{ border: 'none', background: 'none', color: 'var(--p-primary)', fontWeight: '900', cursor: 'pointer' }}>+ Añadir</button></label>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                      {rTasks.map((t, i) => (
-                        <input key={i} value={t} onChange={e => updateRTaskRow(i, e.target.value)} placeholder={`Tarea ${i+1}`} style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)' }} />
-                      ))}
-                    </div>
-                  </div>
-                  <button type="submit" className="btn-primary" style={{ padding: '1rem', marginTop: '1rem' }}>Guardar Rutina</button>
-                </form>
-              </div>
-            </div>
-          )}
-
-          <div className="grid">
-            {members.map((m: Member) => (
-              <div key={m.id} className="card">
-                <h3 className="card-title">{m.avatar} {m.name}</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
-                  {routines.filter((r: Routine) => r.member === m.name).map((r: Routine) => (
-                    <div key={r.id} style={{ padding: '1rem', background: 'var(--p-background)', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                        <span style={{ fontWeight: '900' }}>{r.icon} {r.name}</span>
-                        <span className="badge badge-blue">{r.time}</span>
-                      </div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--p-text-muted)', marginBottom: '1rem' }}>{r.tasks.length} actividades</div>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                         <button onClick={() => deleteRoutine(r.id)} style={{ background: '#fef2f2', border: 'none', padding: '0.4rem', borderRadius: '8px', cursor: 'pointer', flex: 1, color: '#ef4444', fontWeight: '800' }}>Borrar</button>
-                      </div>
-                    </div>
-                  ))}
-                  {routines.filter((r: Routine) => r.member === m.name).length === 0 && <p style={{ fontSize: '0.8rem', textAlign: 'center', color: 'var(--p-text-muted)' }}>Sin rutinas</p>}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Retos y Logros */}
       {activeTab === 'rules' && (
         <div className="card">
@@ -278,44 +179,6 @@ const Settings = () => {
         </div>
       )}
 
-      {/* Tareas Hogar */}
-      {activeTab === 'chores' && (
-        <div className="card">
-           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem', alignItems: 'center' }}>
-             <h3 className="card-title">Responsabilidades del Hogar</h3>
-             <button onClick={() => setShowChoreForm(true)} className="btn-primary">+ Añadir Tarea</button>
-          </div>
-
-          {showChoreForm && (
-            <form onSubmit={handleChoreSubmit} style={{ background: 'var(--p-background)', padding: '1.5rem', borderRadius: '12px', marginBottom: '1.5rem', border: '1px solid var(--border)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', alignItems: 'end' }}>
-              <div><label style={{ fontSize: '0.75rem', fontWeight: '700' }}>Nombre</label><input required value={cName} onChange={e => setCName(e.target.value)} style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--border)' }} /></div>
-              <div><label style={{ fontSize: '0.75rem', fontWeight: '700' }}>Asignar</label>
-                <select value={cUser} onChange={e => setCUser(e.target.value)} style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                  <option value="Familia">Familia (Compartida)</option>
-                  {members.map((m: Member) => <option key={m.id} value={m.name}>{m.name}</option>)}
-                </select>
-              </div>
-              <div><label style={{ fontSize: '0.75rem', fontWeight: '700' }}>Puntos</label><input type="number" value={cPoints} onChange={e => setCPoints(Number(e.target.value))} style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--border)' }} /></div>
-              <button type="submit" className="btn-primary" style={{ padding: '0.6rem' }}><Save size={18}/></button>
-            </form>
-          )}
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {chores.map((c: Chore) => (
-              <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: 'var(--p-background)', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                <div>
-                   <div style={{ fontWeight: '800' }}>{c.name}</div>
-                   <span className="badge badge-blue" style={{ fontSize: '0.65rem' }}>{c.user}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                   <span style={{ fontWeight: '900', color: '#10b981' }}>+{c.points}</span>
-                   <button onClick={() => deleteChore(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><Trash2 size={16} color="#ef4444"/></button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

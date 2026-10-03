@@ -3,8 +3,11 @@ import { Check } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { getLevel, getStreak, levelForXp } from '../utils/gamification';
 import { todayKey } from '../utils/dates';
-import { sounds } from '../utils/audio';
+import { sounds, speak, canSpeak } from '../utils/audio';
 import { notify } from '../utils/push';
+import { todayMissions } from '../utils/habits';
+import { stepIcon, choreIcon } from '../utils/icons';
+import MoodCheck from './MoodCheck';
 
 const ROUTINE_POINTS = 30;
 const PERFECT_DAY_POINTS = 20;
@@ -59,13 +62,10 @@ const Cockpit = ({ kidName, compact = false }: { kidName: string; compact?: bool
     .filter(l => l.member === kidName && l.points > 0 && new Date(l.date).toLocaleDateString('en-CA') === today)
     .reduce((s, l) => s + l.points, 0);
 
-  const myChores = chores.filter(c => c.user === kidName || c.user === 'Familia');
-  const myRoutines = routines.filter(r => r.member === kidName && r.tasks.length > 0).sort((a, b) => a.time.localeCompare(b.time));
+  // Solo lo que toca hoy (según los días de cada rutina y tarea)
+  const { routines: myRoutines, chores: myChores, done, total, pct } = todayMissions(kidName, today, { routines, chores, routineLogs });
   const isTaskDone = (rid: string, i: number) => routineLogs.includes(`${today}_${rid}_${i}`);
   const routineDone = (rid: string, n: number) => n > 0 && Array.from({ length: n }).every((_, i) => isTaskDone(rid, i));
-  const total = myChores.length + myRoutines.length;
-  const done = myChores.filter(c => c.status === 'Hecho').length + myRoutines.filter(r => routineDone(r.id, r.tasks.length)).length;
-  const pct = total ? done / total : 0;
 
   // Combustible XP: 10 celdas hacia el siguiente rango
   const cells = 10;
@@ -192,6 +192,8 @@ const Cockpit = ({ kidName, compact = false }: { kidName: string; compact?: bool
         {combo >= 2 && <span key={combo} className="ck-combo">COMBO x{combo}</span>}
       </div>
 
+      <MoodCheck kidName={kidName} compact={compact} />
+
       {/* Misiones */}
       <div className="ck-missions">
         <div className="ck-missions-head">
@@ -208,13 +210,18 @@ const Cockpit = ({ kidName, compact = false }: { kidName: string; compact?: bool
               <div className="ck-module-head">
                 <span>{r.icon} {r.name}</span>
                 <small>{rDone ? `+${ROUTINE_POINTS} ✓` : `${stepsDone}/${r.tasks.length} · ${r.time}`}</small>
+                {canSpeak() && (
+                  <button className="ck-say" onClick={() => speak(`${r.name}: ${r.tasks.filter((_, i) => !isTaskDone(r.id, i)).join(', ') || '¡ya terminaste!'}`)} aria-label={`Escuchar ${r.name}`}>🔊</button>
+                )}
               </div>
               <div className="ck-steps">
                 {r.tasks.map((t, i) => {
                   const ok = isTaskDone(r.id, i);
                   return (
                     <button key={i} className={`ck-step${ok ? ' on' : ''}`} onClick={() => tapStep(r.id, i, r.tasks.length, r.name)} aria-pressed={ok}>
-                      <i className="ck-led" />{t}
+                      <i className="ck-led" />
+                      <span className="ck-step-ico" aria-hidden>{stepIcon(r, i)}</span>
+                      <span className="ck-step-text">{t}</span>
                       {floatsFor(`${r.id}_${i}`)}
                     </button>
                   );
@@ -229,7 +236,8 @@ const Cockpit = ({ kidName, compact = false }: { kidName: string; compact?: bool
           return (
             <button key={c.id} className={`ck-switch${isDone ? ' on' : ''}`} onClick={() => tapChore(c.id, c.points, isDone, c.name)} aria-pressed={isDone}>
               <span className="ck-toggle"><i>{isDone && <Check size={14} strokeWidth={4} />}</i></span>
-              <span className="ck-switch-name">{c.name}<small>{c.freq}{c.user === 'Familia' ? ' · Familia' : ''}</small></span>
+              <span className="ck-switch-ico" aria-hidden>{choreIcon(c)}</span>
+              <span className="ck-switch-name">{c.name}<small>{c.time ? `${c.time} · ` : ''}{c.freq}{c.user === 'Familia' ? ' · Familia' : ''}</small></span>
               <span className="ck-switch-pts">+{c.points}</span>
               {floatsFor(c.id)}
             </button>

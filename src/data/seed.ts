@@ -46,10 +46,10 @@ export const SEED_PRODUCTS: Product[] = [
 
 export const SEED_ROUTINES: Routine[] = [
   { id: 'r1', member: 'Alan', name: 'Mañana lista', time: '07:00', icon: '🌅', tasks: ['Tender la cama', 'Lavarme los dientes', 'Vestirme', 'Preparar mochila'] },
-  { id: 'r2', member: 'Alan', name: 'Hora de tarea', time: '16:00', icon: '📚', tasks: ['Hacer la tarea', 'Leer 20 minutos'] },
+  { id: 'r2', member: 'Alan', name: 'Hora de tarea', time: '16:00', icon: '📚', days: [1, 2, 3, 4, 5], tasks: ['Hacer la tarea', 'Leer 20 minutos'] },
   { id: 'r3', member: 'Alan', name: 'Noche tranquila', time: '20:00', icon: '🌙', tasks: ['Bañarme', 'Pijama', 'Lavarme los dientes'] },
   { id: 'r4', member: 'Aria', name: 'Mañana lista', time: '07:00', icon: '🌅', tasks: ['Tender la cama', 'Lavarme los dientes', 'Vestirme', 'Peinarme'] },
-  { id: 'r5', member: 'Aria', name: 'Hora de tarea', time: '16:00', icon: '📚', tasks: ['Hacer la tarea', 'Practicar lectura'] },
+  { id: 'r5', member: 'Aria', name: 'Hora de tarea', time: '16:00', icon: '📚', days: [1, 2, 3, 4, 5], tasks: ['Hacer la tarea', 'Practicar lectura'] },
   { id: 'r6', member: 'Aria', name: 'Noche tranquila', time: '20:00', icon: '🌙', tasks: ['Bañarme', 'Pijama', 'Lavarme los dientes'] },
 ];
 

@@ -4,7 +4,6 @@ import { useUser } from '../context/UserContext';
 import { useData } from '../context/DataContext';
 import type { SchoolTask } from '../context/DataContext';
 import { daysUntil } from '../utils/dates';
-import GradesPanel from '../components/GradesPanel';
 
 const categoryColors: Record<string, { bg: string; text: string }> = {
   'Llevar material': { bg: '#eff6ff', text: '#1d4ed8' },
@@ -318,7 +317,6 @@ const SchoolHub = () => {
           </div>
         </div>
       )}
-      <GradesPanel child={isKid ? user?.name || '' : filterChild} canEdit={!isKid} />
     </div>
   );
 };

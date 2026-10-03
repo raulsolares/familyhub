@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Utensils, ShoppingCart, GraduationCap, CheckSquare, Trophy,
-  CalendarDays, Settings, Clock, ChefHat, BookOpen,
+  CalendarDays, Settings, Clock, ChefHat, BookOpen, TrendingUp,
 } from 'lucide-react';
 
 export const NAV_GROUPS = [
@@ -25,6 +25,7 @@ export const NAV_GROUPS = [
     items: [
       { to: '/chores', icon: CheckSquare, label: 'Tareas' },
       { to: '/routines', icon: Clock, label: 'Rutinas' },
+      { to: '/habits', icon: TrendingUp, label: 'Hábitos' },
       { to: '/school', icon: GraduationCap, label: 'Escuela' },
       { to: '/rewards', icon: Trophy, label: 'Puntos y premios' },
     ],

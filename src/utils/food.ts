@@ -52,6 +52,8 @@ export const remainingFor = (
 };
 
 export const MEALS = ['Desayuno', 'Lunch', 'Comida', 'Cena'];
+/** Hora aproximada de cada comida (para la agenda del día de los niños) */
+export const MEAL_TIMES: Record<string, string> = { Desayuno: '07:30', Lunch: '11:00', Comida: '15:00', Cena: '19:30' };
 export const MEAL_EMOJI: Record<string, string> = {
   Desayuno: '🌅', Snack: '🍎', Lunch: '🎒', Comida: '🍽️', Merienda: '🧃', Cena: '🌙',
 };

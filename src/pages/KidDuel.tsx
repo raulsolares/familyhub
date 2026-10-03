@@ -3,6 +3,7 @@ import { ArrowLeft } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import Cockpit from '../components/Cockpit';
 import { todayKey } from '../utils/dates';
+import { todayMissions } from '../utils/habits';
 
 /**
  * Cabina doble: los niños usan el mismo iPad al mismo tiempo.
@@ -13,14 +14,7 @@ const KidDuel = () => {
   const kids = members.filter(m => m.role === 'child').slice(0, 3);
   const today = todayKey();
 
-  const progress = (name: string) => {
-    const myChores = chores.filter(c => c.user === name || c.user === 'Familia');
-    const myRoutines = routines.filter(r => r.member === name && r.tasks.length > 0);
-    const done = myChores.filter(c => c.status === 'Hecho').length
-      + myRoutines.filter(r => r.tasks.every((_, i) => routineLogs.includes(`${today}_${r.id}_${i}`))).length;
-    const total = myChores.length + myRoutines.length;
-    return { done, total, pct: total ? done / total : 0 };
-  };
+  const progress = (name: string) => todayMissions(name, today, { routines, chores, routineLogs });
 
   return (
     <div className="duo">

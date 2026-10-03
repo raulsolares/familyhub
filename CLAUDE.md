@@ -68,6 +68,14 @@ Sin estas variables, la app guarda todo en `localStorage` (clave `fh_state_v2`) 
 - `src/styles/space.css` define el tema `theme-fun` (fondo de estrellas, paneles HUD, fuente Orbitron) y todos los estilos de niños.
 - `components/Cockpit.tsx`: indicadores (energía, combustible XP, racha, estrellas) y misiones con efectos (misión cumplida, combo, ascenso de rango, hipersalto). `pages/KidDuel.tsx` (`/duel`) es la cabina doble: un `Cockpit` por niño lado a lado para usar el mismo iPad.
 
+### Rutinas, hábitos y ánimo
+
+- `Chore` admite `icon`, `days` (0 = domingo), `time` y `since`; `Routine` admite `taskIcons`, `days` y `since`. Lo que toca cada día y el cumplimiento se calcula en `src/utils/habits.ts` (`todayMissions`, `habitsOn`, `dayScore`, rachas). Los dibujitos se sugieren desde el texto con `src/utils/icons.ts`.
+- Historial: `routineLogs` (`fecha_rutina_paso`) y `choreLogs` (`fecha_tarea`), 90 días. `habitsSince` marca desde cuándo hay historial completo.
+- `/today` (`KidToday.tsx`): agenda del día del niño con "ahora", cuenta regresiva y línea de tiempo (rutinas, tareas con hora, comidas con `MEAL_TIMES`, eventos). `/habits` (`Habits.tsx`): cumplimiento diario por niño (papás y niños).
+- Ánimo: `moodLogs` (mañana/tarde/noche, `src/utils/mood.ts`), registrado en `MoodCheck` dentro de la cabina; los ánimos difíciles avisan a los papás por push.
+- `speak()` en `src/utils/audio.ts` lee en voz alta pasos y agenda para niños que no leen.
+
 ### Flujo de Estado Global
 
 Todo el estado de la aplicación vive en **dos contextos**:
@@ -103,7 +111,9 @@ El tema se aplica como clase CSS en el wrapper raíz (`theme-light`, `theme-dark
 | `/shopping` | `ShoppingList.tsx` | Lista de compras con cálculo automático desde el menú |
 | `/shopping/mode` | `ShoppingMode.tsx` | Interfaz móvil para marcar items en el super |
 | `/chores` | `Chores.tsx` | Tareas del hogar + rutinas por miembro |
-| `/school` | `SchoolHub.tsx` | Pendientes escolares con fechas y alertas, y calificaciones |
+| `/school` | `SchoolHub.tsx` | Pendientes escolares con fechas y alertas |
+| `/today` | `KidToday.tsx` | Agenda del día del niño con cuenta regresiva |
+| `/habits` | `Habits.tsx` | Hábitos, cumplimiento diario y estado de ánimo |
 | `/calendar` | `Calendar.tsx` | Calendario mensual con eventos familiares y pendientes escolares |
 | `/rewards` | `Rewards.tsx` | Puntos, historial y tienda de premios |
 | `/duel` | `KidDuel.tsx` | Pantalla dividida competencia entre Alan y Aria |
@@ -111,7 +121,7 @@ El tema se aplica como clase CSS en el wrapper raíz (`theme-light`, `theme-dark
 
 ### Interfaces TypeScript Clave
 
-Todas las interfaces del dominio están en `DataContext.tsx`: `Food`, `WeeklyMenuItem`, `Product`, `Chore`, `Routine`, `SchoolTask`, `Grade`, `FamilyEvent`, `Rule`, `PointLog`, `Member`.
+Todas las interfaces del dominio están en `DataContext.tsx`: `Food`, `WeeklyMenuItem`, `Product`, `Chore`, `Routine`, `SchoolTask`, `MoodLog`, `FamilyEvent`, `Rule`, `PointLog`, `Member`.
 
 ## Pendientes Conocidos
 

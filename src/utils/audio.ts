@@ -135,3 +135,19 @@ export const sounds = {
     { freq: 660, delay: 0.1, duration: 0.15 },
   ]),
 };
+
+/** Lee un texto en voz alta (para niños que todavía no leen) */
+export const speak = (text: string) => {
+  try {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'es-MX';
+    u.rate = 0.95;
+    const voice = window.speechSynthesis.getVoices().find(v => v.lang.startsWith('es'));
+    if (voice) u.voice = voice;
+    window.speechSynthesis.speak(u);
+  } catch { /* sin voz disponible */ }
+};
+
+export const canSpeak = () => typeof window !== 'undefined' && 'speechSynthesis' in window;

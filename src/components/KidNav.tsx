@@ -3,9 +3,9 @@ import { useUser } from '../context/UserContext';
 
 const navItems = [
   { to: '/',         emoji: '🚀', label: 'Cabina' },
-  { to: '/duel',     emoji: '👥', label: 'Doble' },
+  { to: '/today',    emoji: '🕒', label: 'Hoy' },
+  { to: '/habits',   emoji: '📈', label: 'Hábitos' },
   { to: '/school',   emoji: '🎒', label: 'Escuela' },
-  { to: '/calendar', emoji: '🛰️', label: 'Agenda' },
   { to: '/rewards',  emoji: '🏆', label: 'Premios' },
 ];
 

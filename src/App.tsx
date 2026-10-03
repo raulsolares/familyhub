@@ -12,6 +12,8 @@ import Rewards from './pages/Rewards';
 import Settings from './pages/Settings';
 import FoodManager from './pages/FoodManager';
 import KidDuel from './pages/KidDuel';
+import KidToday from './pages/KidToday';
+import Habits from './pages/Habits';
 import PrepView from './pages/PrepView';
 import Calendar from './pages/Calendar';
 import Login from './pages/Login';
@@ -45,6 +47,8 @@ const App = () => {
           <Route path="rewards" element={<Rewards />} />
           <Route path="prep" element={<PrepView />} />
           <Route path="duel" element={<KidDuel />} />
+          <Route path="today" element={<KidToday />} />
+          <Route path="habits" element={<Habits />} />
           <Route path="settings" element={<Settings />} />
           <Route path="calendar" element={<Calendar />} />
         </Route>

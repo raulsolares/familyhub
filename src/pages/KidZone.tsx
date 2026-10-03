@@ -84,6 +84,7 @@ const KidZone = () => {
 
       <section className="kid-actions">
         <Link to="/rewards" className="kid-action a-yellow"><span>🏆</span><p>Tienda</p></Link>
+        <Link to="/today" className="kid-action a-cyan"><span>🕒</span><p>Mi día</p></Link>
         <Link to="/duel" className="kid-action a-purple"><span>👥</span><p>Cabina doble</p></Link>
         <button onClick={() => { setTimeLeft(300); setIsActive(true); setShowTimer(true); }} className="kid-action a-green"><span>☄️</span><p>Reto 5 min</p></button>
       </section>

@@ -18,6 +18,8 @@ import { useMealChanges } from '../hooks/useMealChanges';
 import { buildAgenda } from '../utils/agenda';
 import type { AgendaItem } from '../utils/agenda';
 import EventSheet from '../components/EventSheet';
+import { todayMissions, habitsOn, dayScore, dayStreak } from '../utils/habits';
+import { MOOD_SLOTS, moodById } from '../utils/mood';
 
 const greeting = () => {
   const h = new Date().getHours();
@@ -37,7 +39,7 @@ const Dashboard = () => {
   const data = useData();
   const {
     schoolTasks, weeklyMenu, foods, chores, members, prizeRequests, prizes, familyEvents, routines,
-    routineLogs, pointLogs, points, customShoppingItems, isCloudEnabled, resolvePrizeRequest,
+    routineLogs, pointLogs, points, customShoppingItems, isCloudEnabled, resolvePrizeRequest, choreLogs, habitsSince, moodLogs,
   } = data;
   const push = usePush();
   useNotifications(schoolTasks);
@@ -53,16 +55,19 @@ const Dashboard = () => {
   const kids = members.filter(m => m.role === 'child');
 
   // ── Progreso de niños ──────────────────────────────────────────────────────
+  const habitLogs = { routines, chores, routineLogs, choreLogs };
   const kidStats = kids.map(k => {
-    const myChores = chores.filter(c => c.user === k.name || c.user === 'Familia');
-    const myRoutines = routines.filter(r => r.member === k.name && r.tasks.length > 0);
-    const routineDone = myRoutines.filter(r => r.tasks.every((_, i) => routineLogs.includes(`${today}_${r.id}_${i}`))).length;
-    const choreDone = myChores.filter(c => c.status === 'Hecho' && (c.user !== 'Familia' || c.doneBy === k.name)).length;
-    const total = myChores.length + myRoutines.length;
-    const done = choreDone + routineDone;
+    const m = todayMissions(k.name, today, { routines, chores, routineLogs });
+    const routineDone = m.routines.filter(m.routineDone).length;
+    const choreDone = m.chores.filter(c => c.status === 'Hecho' && (c.user !== 'Familia' || c.doneBy === k.name)).length;
     const level = getLevel(pointLogs, k.name);
-    return { k, total, done, level, streak: getStreak(pointLogs, k.name), points: points[k.name] || 0 };
+    const moods = MOOD_SLOTS.map(s => ({ slot: s, mood: moodById(moodLogs.find(l => l.member === k.name && l.date === today && l.slot === s.id)?.mood) }));
+    return {
+      k, total: m.total, done: choreDone + routineDone, level, streak: getStreak(pointLogs, k.name), points: points[k.name] || 0,
+      habitPct: dayScore(habitsOn(k.name, today, habitLogs)), habitStreak: dayStreak(k.name, today, habitLogs, habitsSince), moods,
+    };
   });
+  const toughMoods = kidStats.flatMap(s => s.moods.filter(m => m.mood?.tough).map(m => ({ k: s.k, ...m })));
   const missionsTotal = kidStats.reduce((s, x) => s + x.total, 0);
   const missionsDone = kidStats.reduce((s, x) => s + x.done, 0);
 
@@ -101,7 +106,7 @@ const Dashboard = () => {
     }
   };
 
-  const attentionCount = mealChanges.pending.length + pendingPrizes.length + schoolSoon.length + (kidsWithoutTomorrow.length ? 1 : 0);
+  const attentionCount = toughMoods.length + mealChanges.pending.length + pendingPrizes.length + schoolSoon.length + (kidsWithoutTomorrow.length ? 1 : 0);
 
   return (
     <div className="dash">
@@ -153,6 +158,16 @@ const Dashboard = () => {
               <div className="panel-body"><p className="panel-empty" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><CheckCircle2 size={16} color="var(--success)" /> Todo en orden por ahora.</p></div>
             ) : (
               <div className="attention-list">
+                {toughMoods.map(t => (
+                  <div key={`${t.k.id}_${t.slot.id}`} className="attention-item">
+                    <span className="attention-icon amber" style={{ fontSize: '1.1rem' }}>{t.mood!.emoji}</span>
+                    <div className="attention-text">
+                      <b>{t.k.avatar} {t.k.name} se siente {t.mood!.label.toLowerCase()}</b>
+                      <span>Lo registró en la {t.slot.label.toLowerCase()}</span>
+                    </div>
+                    <Link to="/habits" className="btn-xs">Ver</Link>
+                  </div>
+                ))}
                 {mealChanges.pending.map(r => {
                   const kid = members.find(m => m.name === r.member);
                   const d = mealChanges.describe(r);
@@ -214,13 +229,13 @@ const Dashboard = () => {
           <section className="panel">
             <div className="panel-head">
               <h3>Niños hoy</h3>
-              <Link to="/rewards">Puntos <ArrowRight size={12} /></Link>
+              <Link to="/habits">Hábitos <ArrowRight size={12} /></Link>
             </div>
             {kidStats.length === 0 ? (
               <div className="panel-body"><p className="panel-empty">Agrega a tus hijos en Configuración.</p></div>
             ) : (
               <div className="kid-progress-grid">
-                {kidStats.map(({ k, total, done, level, streak, points: pts }) => (
+                {kidStats.map(({ k, total, done, level, streak, points: pts, habitPct, habitStreak, moods }) => (
                   <div key={k.id} className="kid-progress">
                     <div className="kid-progress-top">
                       <span className="kid-progress-avatar">{k.avatar}</span>
@@ -235,6 +250,12 @@ const Dashboard = () => {
                       <span><b>{pts}</b> pts</span>
                       <span>🔥 <b>{streak}</b></span>
                     </div>
+                    <Link to="/habits" className="kid-progress-habits">
+                      <span>Hábitos hoy <b>{habitPct === null ? '—' : `${Math.round(habitPct * 100)}%`}</b>{habitStreak > 1 ? ` · racha ${habitStreak} días` : ''}</span>
+                      <span className="kid-progress-moods" aria-label="Ánimo de hoy">
+                        {moods.map(m => <span key={m.slot.id} title={`${m.slot.label}: ${m.mood?.label || 'sin registro'}`}>{m.mood ? m.mood.emoji : <i>{m.slot.emoji}</i>}</span>)}
+                      </span>
+                    </Link>
                   </div>
                 ))}
               </div>

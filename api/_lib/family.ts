@@ -10,8 +10,8 @@ export interface Member { name: string; role: 'parent' | 'child'; avatar?: strin
 export interface PushSub { id: string; member: string; endpoint: string; keys: { p256dh: string; auth: string } }
 export interface FamilyState {
   members?: Member[];
-  chores?: { id: string; name: string; user: string; freq: string; lastDone?: string }[];
-  routines?: { id: string; member: string; name: string; tasks: string[] }[];
+  chores?: { id: string; name: string; user: string; freq: string; lastDone?: string; days?: number[] }[];
+  routines?: { id: string; member: string; name: string; tasks: string[]; days?: number[] }[];
   routineLogs?: string[];
   schoolTasks?: { id: string; child: string; title: string; eventDate: string; deadline: string; completed: boolean }[];
   familyEvents?: { id: string; title: string; date: string; time?: string; members: string[]; repeat?: { freq: 'daily' | 'weekly' | 'monthly' | 'yearly'; interval?: number; weekdays?: number[]; until?: string } }[];
@@ -105,13 +105,19 @@ export const daysBetween = (from: string, to: string) =>
 
 /** Misiones (tareas + rutinas) de un niño para hoy: total y hechas */
 export const missionsFor = (state: FamilyState, kid: string, today: string) => {
-  const chores = (state.chores || []).filter(c => c.user === kid || c.user === 'Familia');
+  // Solo lo que toca hoy según los días de cada tarea o rutina
+  const [y, m, d] = today.split('-').map(Number);
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  const FREQ_DAYS: Record<string, number[]> = { 'Lunes a Viernes': [1, 2, 3, 4, 5], 'Fin de semana': [0, 6] };
+  const onToday = (days: number[] | undefined | null) => !days || days.length === 0 || days.includes(dow);
+  const chores = (state.chores || []).filter(c =>
+    (c.user === kid || c.user === 'Familia') && (/seman/i.test(c.freq) || onToday(c.days?.length ? c.days : FREQ_DAYS[c.freq])));
   const choreDone = (c: { freq: string; lastDone?: string }) => {
     if (!c.lastDone) return false;
     return /seman/i.test(c.freq) ? weekStart(c.lastDone) === weekStart(today) : c.lastDone === today;
   };
   const logs = new Set(state.routineLogs || []);
-  const routines = (state.routines || []).filter(r => r.member === kid);
+  const routines = (state.routines || []).filter(r => r.member === kid && r.tasks.length > 0 && onToday(r.days));
   const routineDone = (r: { id: string; tasks: string[] }) =>
     r.tasks.length > 0 && r.tasks.every((_, i) => logs.has(`${today}_${r.id}_${i}`));
   return {

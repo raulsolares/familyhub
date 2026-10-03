@@ -76,6 +76,14 @@ export interface Chore {
   routineId?: string;
   lastDone?: string;
   doneBy?: string;
+  /** Dibujito (emoji) para niños que no leen; si falta se deduce del nombre */
+  icon?: string;
+  /** Días en que toca (0 = domingo … 6 = sábado). Vacío = según freq */
+  days?: number[];
+  /** Hora sugerida (HH:MM) para la agenda del día */
+  time?: string;
+  /** Fecha de creación (YYYY-MM-DD): antes no cuenta para hábitos */
+  since?: string;
 }
 
 export interface Routine {
@@ -86,6 +94,12 @@ export interface Routine {
   tasks: string[];
   icon: string;
   imageUrl?: string;
+  /** Emoji de cada paso (mismo orden que tasks); si falta se deduce del texto */
+  taskIcons?: string[];
+  /** Días en que toca (0 = domingo … 6 = sábado). Vacío = todos */
+  days?: number[];
+  /** Fecha de creación (YYYY-MM-DD): antes no cuenta para hábitos */
+  since?: string;
 }
 
 export interface SchoolTask {
@@ -98,16 +112,6 @@ export interface SchoolTask {
   deadline: string;
   category: string;
   completed: boolean;
-}
-
-export interface Grade {
-  id: string;
-  child: string;
-  subject: string;
-  period: string;
-  score: number;
-  date: string;
-  notes?: string;
 }
 
 export interface EventRepeat {
@@ -162,6 +166,17 @@ export interface MealChangeRequest {
   quantities?: { [foodId: string]: number };
   status: 'pending' | 'approved' | 'rejected';
   date: string;
+}
+
+export interface MoodLog {
+  id: string;
+  member: string;
+  /** YYYY-MM-DD */
+  date: string;
+  slot: 'morning' | 'afternoon' | 'evening';
+  /** id de MOODS (utils/mood.ts) */
+  mood: string;
+  at: string;
 }
 
 export interface Rule {
@@ -244,7 +259,6 @@ interface AppState {
   weeklyMenu: WeeklyMenuItem[];
   chores: Chore[];
   schoolTasks: SchoolTask[];
-  grades: Grade[];
   familyEvents: FamilyEvent[];
   pointLogs: PointLog[];
   rules: Rule[];
@@ -252,6 +266,11 @@ interface AppState {
   products: Product[];
   shoppingNotes: ShoppingNote[];
   routineLogs: string[];
+  /** `${fecha}_${choreId}` de cada tarea hecha (historial para hábitos) */
+  choreLogs: string[];
+  /** Desde cuándo hay historial completo de hábitos (YYYY-MM-DD) */
+  habitsSince: string;
+  moodLogs: MoodLog[];
   ingredientItems: IngredientItem[];
   schoolCategories: string[];
   prizes: Prize[];
@@ -334,9 +353,8 @@ interface DataContextType extends Omit<AppState, 'chores'> {
   toggleSchoolTask: (id: string, byKid?: boolean) => void;
   updateSchoolCategories: (categories: string[]) => void;
 
-  addGrade: (grade: Omit<Grade, 'id'>) => void;
-  updateGrade: (id: string, grade: Partial<Grade>) => void;
-  deleteGrade: (id: string) => void;
+  /** Guarda (o borra con null) el ánimo de un miembro en un momento del día de hoy */
+  setMood: (member: string, slot: MoodLog['slot'], mood: string | null) => void;
 
   addFamilyEvent: (ev: Omit<FamilyEvent, 'id'>) => void;
   updateFamilyEvent: (id: string, ev: Partial<FamilyEvent>) => void;
@@ -385,6 +403,11 @@ const chorePeriodKey = (c: Pick<Chore, 'freq'>, day = todayKey()) => {
 const isChoreDone = (c: Chore) =>
   !!c.lastDone && chorePeriodKey(c, c.lastDone) === chorePeriodKey(c);
 
+const cutoffKey = (days: number) => {
+  const d = new Date(); d.setDate(d.getDate() - days);
+  return d.toLocaleDateString('en-CA');
+};
+
 const isKidName = (members: Member[], name: string) =>
   members.some(m => m.name === name && m.role === 'child');
 
@@ -394,7 +417,6 @@ const seedState = (): AppState => ({
   weeklyMenu: [],
   chores: SEED_CHORES,
   schoolTasks: [],
-  grades: [],
   familyEvents: SEED_EVENTS(),
   pointLogs: [],
   rules: SEED_RULES,
@@ -402,6 +424,9 @@ const seedState = (): AppState => ({
   products: SEED_PRODUCTS,
   shoppingNotes: [],
   routineLogs: [],
+  choreLogs: [],
+  habitsSince: todayKey(),
+  moodLogs: [],
   ingredientItems: [],
   schoolCategories: ['Llevar material', 'Pagar', 'Examen', 'Evento', 'Sin clases', 'Tarea', 'Otro'],
   prizes: SEED_PRIZES,
@@ -534,18 +559,23 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     const chore = s.chores.find(c => c.id === id);
     if (!chore) return {};
     const key = `chore_${id}_${chorePeriodKey(chore)}`;
+    const logKey = `${chore.lastDone || todayKey()}_${id}`;
     if (isChoreDone(chore)) {
       return {
         chores: s.chores.map(c => (c.id === id ? { ...c, lastDone: undefined, doneBy: undefined } : c)),
         pointLogs: s.pointLogs.filter(l => l.sourceKey !== key),
+        choreLogs: s.choreLogs.filter(l => l !== logKey),
       };
     }
+    const cutoff = cutoffKey(90);
+    const choreLogs = [...s.choreLogs.filter(l => l.slice(0, 10) >= cutoff), `${todayKey()}_${id}`];
     const earner = isKidName(s.members, chore.user)
       ? chore.user
       : doneBy && isKidName(s.members, doneBy) ? doneBy : null;
     const alreadyLogged = s.pointLogs.some(l => l.sourceKey === key);
     return {
       chores: s.chores.map(c => (c.id === id ? { ...c, lastDone: todayKey(), doneBy } : c)),
+      choreLogs,
       pointLogs: earner && !alreadyLogged
         ? [...s.pointLogs, newLog({ member: earner, description: `Tarea: ${chore.name}`, points: chore.points, sourceKey: key })]
         : s.pointLogs,
@@ -579,10 +609,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
     // Solo niños ganan puntos
     if (!isKidName(s.members, memberName)) pointLogs = s.pointLogs;
-    // Limpia registros de rutinas de más de 60 días
-    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 60);
-    const cutoffKey = cutoff.toLocaleDateString('en-CA');
-    return { routineLogs: routineLogs.filter(k => k.slice(0, 10) >= cutoffKey), pointLogs };
+    // Limpia registros de rutinas de más de 90 días
+    const cutoff = cutoffKey(90);
+    return { routineLogs: routineLogs.filter(k => k.slice(0, 10) >= cutoff), pointLogs };
   });
 
   const toggleSchoolTask = (id: string, byKid = false) => patch(s => {
@@ -687,7 +716,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       addShoppingNote: (text) => addTo('shoppingNotes', { text, createdAt: new Date().toISOString() }),
       deleteShoppingNote: (id) => removeFrom('shoppingNotes', id),
 
-      addChore: (c) => addTo('chores', { ...c, status: 'Pendiente' }),
+      addChore: (c) => addTo('chores', { ...c, status: 'Pendiente', since: todayKey() }),
       updateChore: (id, c) => updateIn('chores', id, c),
       deleteChore: (id) => removeFrom('chores', id),
       toggleChore,
@@ -702,7 +731,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       addMember: (m) => addTo('members', m),
       updateMember: (id, m) => updateIn('members', id, m),
 
-      addRoutine: (r) => addTo('routines', r),
+      addRoutine: (r) => addTo('routines', { ...r, since: todayKey() }),
       updateRoutine: (id, r) => updateIn('routines', id, r),
       deleteRoutine: (id) => removeFrom('routines', id),
       toggleRoutineTask,
@@ -717,9 +746,12 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       toggleSchoolTask,
       updateSchoolCategories: (cats) => patch(() => ({ schoolCategories: cats })),
 
-      addGrade: (g) => addTo('grades', g),
-      updateGrade: (id, g) => updateIn('grades', id, g),
-      deleteGrade: (id) => removeFrom('grades', id),
+      setMood: (member, slot, mood) => patch(s => {
+        const date = todayKey();
+        const cutoff = cutoffKey(120);
+        const rest = s.moodLogs.filter(l => l.date >= cutoff && !(l.member === member && l.date === date && l.slot === slot));
+        return { moodLogs: mood ? [...rest, { id: uid(), member, date, slot, mood, at: new Date().toISOString() }] : rest };
+      }),
 
       addFamilyEvent: (e) => addTo('familyEvents', e),
       updateFamilyEvent: (id, e) => updateIn('familyEvents', id, e),

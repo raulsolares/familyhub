@@ -3,6 +3,10 @@ import { Clock, Plus, X, Trash2, Edit2, CheckCircle2, Circle, Image } from 'luci
 import { useUser } from '../context/UserContext';
 import { useData } from '../context/DataContext';
 import type { Routine } from '../context/DataContext';
+import IconPicker from '../components/IconPicker';
+import DayChips from '../components/DayChips';
+import { iconFor, stepIcon } from '../utils/icons';
+import { describeDays, isRoutineOn } from '../utils/habits';
 
 const ICONS = ['🌅', '🪥', '🍳', '🎒', '📚', '🛁', '🌙', '🏃', '🧹', '🎨', '🎮', '🐾'];
 
@@ -23,6 +27,9 @@ const Routines = () => {
   const [icon, setIcon] = useState('🌅');
   const [imageUrl, setImageUrl] = useState('');
   const [taskInputs, setTaskInputs] = useState<string[]>(['']);
+  /** Emoji elegido por paso ('' = automático según el texto) */
+  const [taskIconInputs, setTaskIconInputs] = useState<string[]>(['']);
+  const [days, setDays] = useState<number[]>([]);
 
   const todayStr = new Date().toLocaleDateString('en-CA');
 
@@ -31,14 +38,16 @@ const Routines = () => {
 
   const reset = () => {
     setName(''); setTime('07:00'); setMemberField(members[0]?.name || '');
-    setIcon('🌅'); setImageUrl(''); setTaskInputs(['']);
+    setIcon('🌅'); setImageUrl(''); setTaskInputs(['']); setTaskIconInputs(['']); setDays([]);
     setEditingId(null); setShowForm(false);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const tasks = taskInputs.filter(t => t.trim() !== '');
-    const data = { name, time, member, icon, imageUrl: imageUrl.trim(), tasks };
+    const keep = taskInputs.map((t, i) => ({ t: t.trim(), ic: taskIconInputs[i] || '' })).filter(x => x.t !== '');
+    const tasks = keep.map(x => x.t);
+    const taskIcons = keep.map(x => x.ic || iconFor(x.t));
+    const data = { name, time, member, icon, imageUrl: imageUrl.trim(), tasks, taskIcons, days: days.length && days.length < 7 ? days : [] };
     if (editingId) {
       updateRoutine(editingId, data);
     } else {
@@ -51,20 +60,30 @@ const Routines = () => {
     setEditingId(r.id); setName(r.name); setTime(r.time);
     setMemberField(r.member); setIcon(r.icon); setImageUrl(r.imageUrl || '');
     setTaskInputs(r.tasks.length > 0 ? [...r.tasks, ''] : ['']);
+    setTaskIconInputs(r.tasks.length > 0 ? [...r.tasks.map((_, i) => r.taskIcons?.[i] || ''), ''] : ['']);
+    setDays(r.days || []);
     setShowForm(true);
   };
 
   const updateTask = (idx: number, val: string) => {
     const next = [...taskInputs];
     next[idx] = val;
-    if (idx === next.length - 1 && val.trim() !== '') next.push('');
+    if (idx === next.length - 1 && val.trim() !== '') {
+      next.push('');
+      setTaskIconInputs(ics => [...ics, '']);
+    }
     setTaskInputs(next);
   };
 
+  const setTaskIcon = (idx: number, ic: string) =>
+    setTaskIconInputs(ics => { const next = [...ics]; next[idx] = ic; return next; });
+
   const removeTask = (idx: number) => {
     const next = taskInputs.filter((_, i) => i !== idx);
-    if (next.length === 0) next.push('');
+    const nextIcons = taskIconInputs.filter((_, i) => i !== idx);
+    if (next.length === 0) { next.push(''); nextIcons.push(''); }
     setTaskInputs(next);
+    setTaskIconInputs(nextIcons);
   };
 
   const visibleRoutines = isKid
@@ -128,6 +147,11 @@ const Routines = () => {
                 </select>
               </div>
 
+              <div className="form-group">
+                <label className="form-label">Días (vacío = todos los días)</label>
+                <DayChips value={days} onChange={setDays} />
+              </div>
+
               {/* Selector de ícono */}
               <div className="form-group">
                 <label className="form-label">Ícono</label>
@@ -160,13 +184,14 @@ const Routines = () => {
 
               {/* Pasos */}
               <div className="form-group">
-                <label className="form-label">Pasos / Actividades</label>
+                <label className="form-label">Pasos con dibujito (toca el dibujito para cambiarlo)</label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   {taskInputs.map((t, i) => (
                     <div key={i} style={{ display: 'flex', gap: '0.375rem', alignItems: 'center' }}>
                       <span style={{ width: '20px', fontSize: '0.75rem', color: 'var(--p-text-muted)', textAlign: 'right', flexShrink: 0 }}>
                         {i + 1}.
                       </span>
+                      <IconPicker value={taskIconInputs[i] || iconFor(t)} onChange={ic => setTaskIcon(i, ic)} />
                       <input
                         value={t}
                         onChange={e => updateTask(i, e.target.value)}
@@ -248,6 +273,8 @@ const Routines = () => {
                       <Clock size={11} /> {routine.time}
                     </span>
                     <span className="badge badge-blue">{routine.member}</span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--p-text-muted)' }}>{describeDays(routine.days)}</span>
+                    {!isRoutineOn(routine, todayStr) && total > 0 && <span className="badge">Hoy no toca</span>}
                   </div>
                 </div>
                 {role === 'parent' && (
@@ -296,6 +323,7 @@ const Routines = () => {
                             ? <CheckCircle2 size={18} color="var(--success)" style={{ flexShrink: 0 }} />
                             : <Circle size={18} color="var(--border)" strokeWidth={2} style={{ flexShrink: 0 }} />
                           }
+                          <span aria-hidden style={{ fontSize: '1.25rem', width: '1.75rem', textAlign: 'center', flexShrink: 0 }}>{stepIcon(routine, idx)}</span>
                           <span style={{
                             fontSize: '0.875rem',
                             fontWeight: done ? '400' : '500',
