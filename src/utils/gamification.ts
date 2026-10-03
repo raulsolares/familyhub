@@ -11,17 +11,18 @@ export interface LevelInfo {
   progress: number;  // 0..1
 }
 
+// Rangos espaciales: cada nivel es un ascenso en la nave
 const LEVELS = [
-  { at: 0, title: 'Aprendiz', emoji: '🐣' },
-  { at: 100, title: 'Explorador', emoji: '🧭' },
-  { at: 250, title: 'Ayudante', emoji: '🛠️' },
-  { at: 500, title: 'Héroe del hogar', emoji: '🦸' },
-  { at: 900, title: 'Campeón', emoji: '🏅' },
-  { at: 1400, title: 'Súper estrella', emoji: '🌟' },
-  { at: 2000, title: 'Leyenda', emoji: '🐉' },
-  { at: 2800, title: 'Maestro', emoji: '🧙' },
-  { at: 3800, title: 'Gran maestro', emoji: '👑' },
-  { at: 5000, title: 'Mítico', emoji: '🚀' },
+  { at: 0, title: 'Cadete', emoji: '🧑‍🚀' },
+  { at: 100, title: 'Explorador', emoji: '🛰️' },
+  { at: 250, title: 'Navegante', emoji: '🧭' },
+  { at: 500, title: 'Piloto', emoji: '🚀' },
+  { at: 900, title: 'Capitán', emoji: '🌙' },
+  { at: 1400, title: 'Comandante', emoji: '🪐' },
+  { at: 2000, title: 'Almirante', emoji: '☄️' },
+  { at: 2800, title: 'Guardián estelar', emoji: '🌟' },
+  { at: 3800, title: 'Leyenda galáctica', emoji: '🌌' },
+  { at: 5000, title: 'Emperador del cosmos', emoji: '👑' },
 ];
 
 const earnedLogs = (logs: PointLog[], member: string) =>
@@ -31,8 +32,9 @@ const earnedLogs = (logs: PointLog[], member: string) =>
 export const getXp = (logs: PointLog[], member: string) =>
   earnedLogs(logs, member).reduce((s, l) => s + l.points, 0);
 
-export const getLevel = (logs: PointLog[], member: string): LevelInfo => {
-  const xp = getXp(logs, member);
+export const getLevel = (logs: PointLog[], member: string): LevelInfo => levelForXp(getXp(logs, member));
+
+export const levelForXp = (xp: number): LevelInfo => {
   let idx = 0;
   LEVELS.forEach((l, i) => { if (xp >= l.at) idx = i; });
   const cur = LEVELS[idx];

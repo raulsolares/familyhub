@@ -4,6 +4,7 @@ import {
   cronAllowed, dayKey, dayName, daysBetween, loadState, missingConfig, missionsFor, sendTo,
   type FamilyState,
 } from '../_lib/family.js';
+import { occurrences } from '../../src/utils/events.js';
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
@@ -15,13 +16,15 @@ const morning = async (state: FamilyState) => {
   let sent = 0;
 
   // Papás: agenda, escuela y premios por aprobar
-  const events = (state.familyEvents || []).filter(e => e.date === today);
+  const events = (state.familyEvents || []).filter(e => occurrences(e, today, today).length > 0);
   const school = (state.schoolTasks || []).filter(t => !t.completed && [t.eventDate, t.deadline].some(d => d && daysBetween(today, d) >= 0 && daysBetween(today, d) <= 1));
   const prizes = (state.prizeRequests || []).filter(r => r.status === 'pending');
+  const mealChanges = (state.mealChangeRequests || []).filter(r => r.status === 'pending');
   const lines = [
     ...events.map(e => `📅 ${e.time ? e.time + ' ' : ''}${e.title}`),
     ...school.map(t => `🎒 ${t.child}: ${t.title}${(t.eventDate || t.deadline) === today ? ' (hoy)' : ' (mañana)'}`),
     ...(prizes.length ? [`🎁 ${plural(prizes.length, 'premio por aprobar', 'premios por aprobar')}`] : []),
+    ...(mealChanges.length ? [`🍽️ ${plural(mealChanges.length, 'cambio de comida por aprobar', 'cambios de comida por aprobar')}`] : []),
   ];
   if (lines.length) {
     sent += await sendTo(state, parents, { title: '☀️ Hoy en casa', body: lines.slice(0, 4).join('\n'), url: '/', tag: `digest-${today}` });

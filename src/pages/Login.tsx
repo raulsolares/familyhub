@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 import { useData } from '../context/DataContext';
 import type { Member } from '../context/DataContext';
@@ -7,6 +8,7 @@ import { Home, ArrowLeft, Delete } from 'lucide-react';
 const Login = () => {
   const { login } = useUser();
   const { members } = useData();
+  const navigate = useNavigate();
   const [selected, setSelected] = useState<Member | null>(null);
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
@@ -75,6 +77,11 @@ const Login = () => {
               <div className="login-grid">{parents.map(m => tile(m, false))}</div>
               <p className="login-section" style={{ marginTop: '1.25rem' }}>Niños</p>
               <div className="login-grid">{kids.map(m => tile(m, true))}</div>
+              {kids.length > 1 && kids.every(k => !k.pin) && (
+                <button className="login-duo" onClick={() => { login(kids[0]); navigate('/duel'); }}>
+                  👥 Cabina doble <small>({kids.map(k => k.name).join(' y ')} en la misma pantalla)</small>
+                </button>
+              )}
             </>
           ) : (
             <div style={{ textAlign: 'center' }}>

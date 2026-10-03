@@ -2,11 +2,10 @@ import { NavLink } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 
 const navItems = [
-  { to: '/',         emoji: '🏠', label: 'Inicio' },
-  { to: '/chores',   emoji: '🧹', label: 'Tareas' },
-  { to: '/routines', emoji: '⏰', label: 'Rutinas' },
+  { to: '/',         emoji: '🚀', label: 'Cabina' },
+  { to: '/duel',     emoji: '👥', label: 'Doble' },
   { to: '/school',   emoji: '🎒', label: 'Escuela' },
-  { to: '/calendar', emoji: '📅', label: 'Agenda' },
+  { to: '/calendar', emoji: '🛰️', label: 'Agenda' },
   { to: '/rewards',  emoji: '🏆', label: 'Premios' },
 ];
 

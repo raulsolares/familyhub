@@ -18,6 +18,7 @@ import Login from './pages/Login';
 import { useUser } from './context/UserContext';
 import './styles/App.css';
 import './styles/design.css';
+import './styles/space.css';
 
 const App = () => {
   const { isLoggedIn } = useUser();

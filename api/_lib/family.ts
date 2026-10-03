@@ -14,7 +14,8 @@ export interface FamilyState {
   routines?: { id: string; member: string; name: string; tasks: string[] }[];
   routineLogs?: string[];
   schoolTasks?: { id: string; child: string; title: string; eventDate: string; deadline: string; completed: boolean }[];
-  familyEvents?: { id: string; title: string; date: string; time?: string; members: string[] }[];
+  familyEvents?: { id: string; title: string; date: string; time?: string; members: string[]; repeat?: { freq: 'daily' | 'weekly' | 'monthly' | 'yearly'; interval?: number; weekdays?: number[]; until?: string } }[];
+  mealChangeRequests?: { status: string }[];
   prizeRequests?: { id: string; member: string; status: string }[];
   weeklyMenu?: { day: string; member: string; foodIds: string[] }[];
   pushSubscriptions?: PushSub[];

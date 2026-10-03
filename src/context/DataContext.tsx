@@ -110,15 +110,58 @@ export interface Grade {
   notes?: string;
 }
 
+export interface EventRepeat {
+  freq: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  /** Cada cuántos días/semanas/meses/años (1 = todos) */
+  interval?: number;
+  /** Para semanales: días de la semana (0 = domingo … 6 = sábado). Vacío = el mismo día que `date` */
+  weekdays?: number[];
+  /** Última fecha (YYYY-MM-DD), opcional */
+  until?: string;
+}
+
+export interface EventAssignment {
+  member: string;
+  task: string;
+}
+
 export interface FamilyEvent {
   id: string;
   title: string;
   date: string;
   time?: string;
+  endTime?: string;
   /** Nombres de miembros, o 'Familia' */
   members: string[];
   color?: string;
   notes?: string;
+  location?: string;
+  repeat?: EventRepeat;
+  /** Quién hace qué en el evento */
+  assignments?: EventAssignment[];
+}
+
+export interface CalendarFeed {
+  id: string;
+  name: string;
+  /** Dirección iCal (.ics) del calendario, p. ej. la "dirección secreta" de Google Calendar */
+  url: string;
+  color: string;
+  members: string[];
+}
+
+export interface MealChangeRequest {
+  id: string;
+  member: string;
+  day: string;
+  meal: string;
+  /** swap: intercambiar con el mismo tiempo de comida de otro día. replace: elegir otros platillos */
+  kind: 'swap' | 'replace';
+  swapDay?: string;
+  foodIds?: string[];
+  quantities?: { [foodId: string]: number };
+  status: 'pending' | 'approved' | 'rejected';
+  date: string;
 }
 
 export interface Rule {
@@ -217,6 +260,10 @@ interface AppState {
   extraItems: ExtraItem[];
   foodGroupLimits: Record<string, number>;
   pushSubscriptions: PushSubscriptionRecord[];
+  calendarFeeds: CalendarFeed[];
+  /** Miembro → lunes (YYYY-MM-DD) de la semana cuyo menú ya confirmó */
+  menuLocks: Record<string, string>;
+  mealChangeRequests: MealChangeRequest[];
 }
 
 // ── Context type ─────────────────────────────────────────────────────────────
@@ -234,6 +281,17 @@ interface DataContextType extends Omit<AppState, 'chores'> {
 
   savePushSubscription: (sub: Omit<PushSubscriptionRecord, 'id' | 'createdAt'>) => void;
   removePushSubscription: (endpoint: string) => void;
+
+  addCalendarFeed: (feed: Omit<CalendarFeed, 'id'>) => void;
+  updateCalendarFeed: (id: string, feed: Partial<CalendarFeed>) => void;
+  deleteCalendarFeed: (id: string) => void;
+
+  isMenuLocked: (member: string) => boolean;
+  lockMenu: (member: string) => void;
+  unlockMenu: (member: string) => void;
+  requestMealChange: (req: Omit<MealChangeRequest, 'id' | 'status' | 'date'>) => void;
+  resolveMealChange: (id: string, approve: boolean) => void;
+  cancelMealChange: (id: string) => void;
 
   addIngredientItem: (item: Omit<IngredientItem, 'id'>) => void;
   deleteIngredientItem: (id: string) => void;
@@ -352,6 +410,9 @@ const seedState = (): AppState => ({
   extraItems: [],
   foodGroupLimits: SEED_FOOD_GROUP_LIMITS,
   pushSubscriptions: [],
+  calendarFeeds: [],
+  menuLocks: {},
+  mealChangeRequests: [],
 });
 
 /** Acepta datos guardados (local o nube) de versiones anteriores y los normaliza */
@@ -578,6 +639,44 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         pushSubscriptions: s.pushSubscriptions.filter(p => p.endpoint !== endpoint),
       })),
 
+      addCalendarFeed: (f) => addTo('calendarFeeds', f),
+      updateCalendarFeed: (id, f) => updateIn('calendarFeeds', id, f),
+      deleteCalendarFeed: (id) => removeFrom('calendarFeeds', id),
+
+      isMenuLocked: (member) => state.menuLocks[member] === weekStartKey(),
+      lockMenu: (member) => patch(s => ({ menuLocks: { ...s.menuLocks, [member]: weekStartKey() } })),
+      unlockMenu: (member) => patch(s => {
+        const next = { ...s.menuLocks }; delete next[member];
+        return { menuLocks: next };
+      }),
+      requestMealChange: (r) => patch(s => ({
+        mealChangeRequests: [
+          // Una sola solicitud pendiente por comida
+          ...s.mealChangeRequests.filter(x => !(x.status === 'pending' && x.member === r.member && x.day === r.day && x.meal === r.meal)),
+          { ...r, id: uid(), status: 'pending', date: new Date().toISOString() },
+        ],
+      })),
+      resolveMealChange: (id, approve) => patch(s => {
+        const req = s.mealChangeRequests.find(r => r.id === id);
+        if (!req || req.status !== 'pending') return {};
+        const requests = s.mealChangeRequests.map(r => (r.id === id ? { ...r, status: approve ? 'approved' as const : 'rejected' as const } : r));
+        if (!approve) return { mealChangeRequests: requests };
+        const find = (day: string) => s.weeklyMenu.find(w => w.day === day && w.meal === req.meal && w.member === req.member);
+        const without = (list: WeeklyMenuItem[], day: string) => list.filter(w => !(w.day === day && w.meal === req.meal && w.member === req.member));
+        const slot = (day: string, foodIds: string[], quantities: Record<string, number>): WeeklyMenuItem[] =>
+          foodIds.length ? [{ id: uid(), day, meal: req.meal, member: req.member, foodIds, quantities, ate: false }] : [];
+        let weeklyMenu = without(s.weeklyMenu, req.day);
+        if (req.kind === 'swap' && req.swapDay) {
+          const a = find(req.day); const b = find(req.swapDay);
+          weeklyMenu = without(weeklyMenu, req.swapDay);
+          weeklyMenu = [...weeklyMenu, ...slot(req.day, b?.foodIds || [], b?.quantities || {}), ...slot(req.swapDay, a?.foodIds || [], a?.quantities || {})];
+        } else {
+          weeklyMenu = [...weeklyMenu, ...slot(req.day, req.foodIds || [], req.quantities || {})];
+        }
+        return { mealChangeRequests: requests, weeklyMenu };
+      }),
+      cancelMealChange: (id) => removeFrom('mealChangeRequests', id),
+
       addIngredientItem: (i) => addTo('ingredientItems', i),
       deleteIngredientItem: (id) => removeFrom('ingredientItems', id),
 
@@ -610,7 +709,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
       assignMeal,
       toggleAte: (id) => patch(s => ({ weeklyMenu: s.weeklyMenu.map(x => (x.id === id ? { ...x, ate: !x.ate } : x)) })),
-      clearWeeklyMenu: () => patch(() => ({ weeklyMenu: [] })),
+      clearWeeklyMenu: () => patch(() => ({ weeklyMenu: [], menuLocks: {}, mealChangeRequests: [] })),
 
       addSchoolTask: (t) => addTo('schoolTasks', { ...t, completed: false }),
       updateSchoolTask: (id, t) => updateIn('schoolTasks', id, t),

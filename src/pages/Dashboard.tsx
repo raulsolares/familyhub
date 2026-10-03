@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Bell, BellRing, Target, GraduationCap, Gift, ShoppingCart, ArrowRight, CheckCircle2,
-  AlertTriangle, Utensils, CalendarDays, Activity, Check, X,
+  AlertTriangle, Utensils, CalendarDays, Activity, Check, X, Repeat, Link2,
 } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useData } from '../context/DataContext';
@@ -12,6 +13,11 @@ import { getLevel, getStreak } from '../utils/gamification';
 import { MEALS, MEAL_EMOJI, foodEmoji } from '../utils/food';
 import { todayKey, todayName, daysUntil, WEEK_DAYS } from '../utils/dates';
 import { notify } from '../utils/push';
+import { useCalendarFeeds } from '../hooks/useCalendarFeeds';
+import { useMealChanges } from '../hooks/useMealChanges';
+import { buildAgenda } from '../utils/agenda';
+import type { AgendaItem } from '../utils/agenda';
+import EventSheet from '../components/EventSheet';
 
 const greeting = () => {
   const h = new Date().getHours();
@@ -35,6 +41,9 @@ const Dashboard = () => {
   } = data;
   const push = usePush();
   useNotifications(schoolTasks);
+  const { feeds } = useCalendarFeeds();
+  const mealChanges = useMealChanges();
+  const [viewing, setViewing] = useState<AgendaItem | null>(null);
 
   if (viewMode === 'child') return <KidZone />;
 
@@ -64,13 +73,9 @@ const Dashboard = () => {
     .filter(t => t.d <= 3)
     .sort((a, b) => a.d - b.d);
 
-  const agenda = [
-    ...familyEvents.map(e => ({ id: e.id, date: e.date, time: e.time, title: e.title, who: e.members.join(', '), color: e.color || 'var(--p-primary)' })),
-    ...openSchool.filter(t => t.eventDate).map(t => ({ id: t.id, date: t.eventDate, time: t.eventTime, title: t.title, who: `${t.child} · ${t.category}`, color: '#a16207' })),
-  ]
-    .filter(a => daysUntil(a.date) >= 0 && daysUntil(a.date) <= 7)
-    .sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')))
-    .slice(0, 7);
+  const in7 = (() => { const d = new Date(); d.setDate(d.getDate() + 7); return d.toLocaleDateString('en-CA'); })();
+  const agenda = buildAgenda({ familyEvents, schoolTasks: openSchool, feeds }, today, in7).slice(0, 8);
+  const avatarOf = (n: string) => (n === 'Familia' ? '👨‍👩‍👧‍👦' : members.find(m => m.name === n)?.avatar || '');
 
   // ── Pendientes de atención ─────────────────────────────────────────────────
   const pendingPrizes = prizeRequests.filter(r => r.status === 'pending');
@@ -96,7 +101,7 @@ const Dashboard = () => {
     }
   };
 
-  const attentionCount = pendingPrizes.length + schoolSoon.length + (kidsWithoutTomorrow.length ? 1 : 0);
+  const attentionCount = mealChanges.pending.length + pendingPrizes.length + schoolSoon.length + (kidsWithoutTomorrow.length ? 1 : 0);
 
   return (
     <div className="dash">
@@ -148,6 +153,23 @@ const Dashboard = () => {
               <div className="panel-body"><p className="panel-empty" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><CheckCircle2 size={16} color="var(--success)" /> Todo en orden por ahora.</p></div>
             ) : (
               <div className="attention-list">
+                {mealChanges.pending.map(r => {
+                  const kid = members.find(m => m.name === r.member);
+                  const d = mealChanges.describe(r);
+                  return (
+                    <div key={r.id} className="attention-item">
+                      <span className="attention-icon amber"><Utensils size={16} /></span>
+                      <div className="attention-text">
+                        <b>{kid?.avatar} {r.member}: {d.title}</b>
+                        <span>{d.detail}</span>
+                      </div>
+                      <div className="attention-actions">
+                        <button className="btn-xs" onClick={() => mealChanges.resolve(r.id, false)} aria-label="Rechazar cambio"><X size={13} /></button>
+                        <button className="btn-xs primary" onClick={() => mealChanges.resolve(r.id, true)}><Check size={13} /> Aprobar</button>
+                      </div>
+                    </div>
+                  );
+                })}
                 {pendingPrizes.map(r => {
                   const prize = prizes.find(p => p.id === r.prizeId);
                   const kid = members.find(m => m.name === r.member);
@@ -270,10 +292,15 @@ const Dashboard = () => {
             ) : (
               <ul className="agenda">
                 {agenda.map(a => (
-                  <li key={a.id}>
-                    <span className="agenda-when">{fmtDay(a.date)}{a.time ? <><br />{a.time}</> : null}</span>
-                    <span className="agenda-bar" style={{ background: a.color }} />
-                    <span className="agenda-text"><b>{a.title}</b><span>{a.who}</span></span>
+                  <li key={a.key}>
+                    <button className="agenda-btn" onClick={() => setViewing(a)}>
+                      <span className="agenda-when">{fmtDay(a.date)}{a.time ? <><br />{a.time}</> : null}</span>
+                      <span className="agenda-bar" style={{ background: a.color }} />
+                      <span className="agenda-text">
+                        <b>{a.title} {a.repeatText && <Repeat size={11} />}{a.kind === 'feed' && <Link2 size={11} />}</b>
+                        <span>{a.who.map(avatarOf).join('')} {a.who.join(', ')}{a.assignments?.length ? ` · ${a.assignments.map(x => `${x.member}: ${x.task}`).join(' · ')}` : ''}</span>
+                      </span>
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -301,6 +328,7 @@ const Dashboard = () => {
           </section>
         </div>
       </div>
+      {viewing && <EventSheet item={viewing} onClose={() => setViewing(null)} />}
     </div>
   );
 };

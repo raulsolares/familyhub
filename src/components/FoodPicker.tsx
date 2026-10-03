@@ -11,6 +11,10 @@ interface Props {
   meal: string;
   onClose: () => void;
   onSaved?: () => void;
+  /** En lugar de guardar directo (p. ej. pedir permiso a papás) */
+  onSubmit?: (foodIds: string[], quantities: Record<string, number>) => void;
+  submitLabel?: string;
+  title?: string;
 }
 
 /**
@@ -18,7 +22,7 @@ interface Props {
  * - Niños: mosaico grande con emojis; los topes semanales bloquean.
  * - Papás: lista compacta con búsqueda; los topes solo avisan y se puede aplicar a varios miembros.
  */
-const FoodPicker = ({ mode, member, day, meal, onClose, onSaved }: Props) => {
+const FoodPicker = ({ mode, member, day, meal, onClose, onSaved, onSubmit, submitLabel, title }: Props) => {
   const { foods, weeklyMenu, members, foodGroupLimits, assignMeal } = useData();
   const isKid = mode === 'kid';
 
@@ -69,6 +73,7 @@ const FoodPicker = ({ mode, member, day, meal, onClose, onSaved }: Props) => {
 
   const save = () => {
     const ids = Object.keys(quantities);
+    if (onSubmit) { onSubmit(ids, quantities); onClose(); return; }
     [member, ...alsoFor].forEach(m => assignMeal(day, meal, ids, m, quantities));
     if (isKid) sounds.save();
     onSaved?.();
@@ -89,7 +94,7 @@ const FoodPicker = ({ mode, member, day, meal, onClose, onSaved }: Props) => {
           <div className="sheet-head">
             <div>
               <p className="kid-sheet-kicker">{MEAL_EMOJI[meal]} {meal} · {day}</p>
-              <h2 className="kid-sheet-title">¿Qué se te antoja?</h2>
+              <h2 className="kid-sheet-title">{title || '¿Qué se te antoja?'}</h2>
             </div>
             <button className="sheet-close" onClick={onClose} aria-label="Cerrar"><X size={20} /></button>
           </div>
@@ -147,7 +152,7 @@ const FoodPicker = ({ mode, member, day, meal, onClose, onSaved }: Props) => {
                 })}
             </div>
             <button className="kid-save" onClick={save} disabled={!selectedIds.length && !slot}>
-              {selectedIds.length ? '¡Listo! 🎉' : 'Dejar vacío'}
+              {submitLabel || (selectedIds.length ? '¡Listo! 🎉' : 'Dejar vacío')}
             </button>
           </div>
         </div>

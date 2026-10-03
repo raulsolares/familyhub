@@ -53,6 +53,21 @@ Sin estas variables, la app guarda todo en `localStorage` (clave `fh_state_v2`) 
 - `public/sw.js` muestra la notificación y abre la URL al tocarla.
 - Limitación: `/api/push/notify` no tiene autenticación (igual que Firestore).
 
+### Calendario
+
+- `FamilyEvent` admite `repeat` (diario/semanal con días/mensual/anual, `interval`, `until`), `assignments` (quién hace qué), `endTime` y `location`. Las repeticiones se expanden con `src/utils/events.ts` (sin dependencias; también lo usa `/api`).
+- `src/utils/agenda.ts` (`buildAgenda`) junta eventos, escuela y calendarios suscritos para Calendario, Dashboard y la cabina de niños. `EventSheet` muestra el evento completo; `EventForm` lo crea/edita.
+- Calendarios externos (`calendarFeeds`): se suscriben con la dirección iCal (p. ej. la "dirección secreta" de Google Calendar). `api/calendar/feed.ts` descarga y expande el .ics con `ical.js` (`api/_lib/ics.ts`); `src/hooks/useCalendarFeeds.ts` refresca cada 15 min y cachea en `localStorage` (`fh_feeds_cache`). Solo lectura.
+
+### Comida semanal con aprobación
+
+- El niño elige su semana y la confirma (`menuLocks[miembro] = lunes de la semana`). Ya confirmada, cada cambio es una `MealChangeRequest` (`swap` con otro día o `replace` por otros platillos) que los papás aprueban en el Dashboard o en Menú semanal (`useMealChanges`), con aviso push en ambos sentidos. `clearWeeklyMenu` reinicia bloqueos y solicitudes.
+
+### Interfaz de niños (cabina espacial)
+
+- `src/styles/space.css` define el tema `theme-fun` (fondo de estrellas, paneles HUD, fuente Orbitron) y todos los estilos de niños.
+- `components/Cockpit.tsx`: indicadores (energía, combustible XP, racha, estrellas) y misiones con efectos (misión cumplida, combo, ascenso de rango, hipersalto). `pages/KidDuel.tsx` (`/duel`) es la cabina doble: un `Cockpit` por niño lado a lado para usar el mismo iPad.
+
 ### Flujo de Estado Global
 
 Todo el estado de la aplicación vive en **dos contextos**:

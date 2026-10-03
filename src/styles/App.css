@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Nunito:wght@400;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Orbitron:wght@600;700;800;900&family=Nunito:wght@400;600;700;800;900&display=swap');
 
 /* ── PARENT THEMES ──────────────────────────────────────────────────────── */
 
@@ -99,8 +99,8 @@
   --radius-xl: 28px;
 }
 
-.theme-fun, .theme-fun * {
-  font-family: 'Nunito', system-ui, sans-serif !important;
+.theme-fun, .theme-fun button, .theme-fun input, .theme-fun select, .theme-fun textarea {
+  font-family: 'Nunito', system-ui, sans-serif;
 }
 
 /* ── RESET ──────────────────────────────────────────────────────────────── */
@@ -892,3 +892,9 @@ select { cursor: pointer; }
   .cal-dot { display: flex !important; }
 }
 
+
+.login-duo {
+  width: 100%; margin-top: 0.75rem; padding: 0.8rem; border-radius: 14px; cursor: pointer; font: inherit; font-weight: 800; font-size: 0.95rem;
+  border: 1px solid #312e81; color: #e0f2fe; background: linear-gradient(135deg, #0b1330, #312e81);
+}
+.login-duo small { display: block; font-weight: 600; font-size: 0.72rem; opacity: 0.8; }

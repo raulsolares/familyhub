@@ -1,15 +1,19 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, RefreshCw, Copy, ShoppingCart, BookOpen, Check } from 'lucide-react';
+import { Plus, RefreshCw, Copy, ShoppingCart, BookOpen, Check, Lock, Unlock, X } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import FoodPicker from '../components/FoodPicker';
 import { MEALS, MEAL_EMOJI, foodEmoji, getFoodUsage } from '../utils/food';
 import { WEEK_DAYS, todayName } from '../utils/dates';
+import { useMealChanges } from '../hooks/useMealChanges';
+
+const FAMILY = '__familia';
 
 const WeeklyMenu = () => {
-  const { weeklyMenu, foods, members, foodGroupLimits, assignMeal, clearWeeklyMenu } = useData();
-  const [member, setMember] = useState(members.find(m => m.role === 'child')?.name || members[0]?.name || '');
-  const [picking, setPicking] = useState<{ day: string; meal: string } | null>(null);
+  const { weeklyMenu, foods, members, foodGroupLimits, assignMeal, clearWeeklyMenu, isMenuLocked, unlockMenu, lockMenu } = useData();
+  const mealChanges = useMealChanges();
+  const [member, setMember] = useState(FAMILY);
+  const [picking, setPicking] = useState<{ day: string; meal: string; member: string } | null>(null);
   const [confirmNewWeek, setConfirmNewWeek] = useState(false);
   const [copyFrom, setCopyFrom] = useState<string | null>(null);
   const today = todayName();
@@ -22,7 +26,23 @@ const WeeklyMenu = () => {
   const filled = (who: string) => weeklyMenu.filter(w => w.member === who && w.foodIds.length > 0).length;
 
   const kids = members.filter(m => m.role === 'child');
+  const isFamily = member === FAMILY;
   const memberObj = members.find(m => m.name === member);
+  const pick = (day: string, meal: string, who = member) => setPicking({ day, meal, member: who });
+
+  /** Vista familia: una línea por miembro dentro de cada comida */
+  const familyLines = (day: string, meal: string, compact: boolean) => members.map(m => {
+    const slot = slotFor(day, meal, m.name);
+    const items = slot ? slot.foodIds.map(fid => foods.find(f => f.id === fid)).filter(Boolean) : [];
+    return (
+      <button key={m.id} className={`fam-line${items.length ? '' : ' empty'}${slot?.ate ? ' ate' : ''}`} onClick={() => pick(day, meal, m.name)} aria-label={`${meal} del ${day} de ${m.name}`}>
+        <span className="fam-av">{m.avatar}</span>
+        {items.length
+          ? <span className="fam-food">{compact ? items.map(f => foodEmoji(f!)).join('') : items.map(f => `${foodEmoji(f!)} ${f!.name}`).join(', ')}</span>
+          : <span className="fam-food muted">{compact ? '·' : 'Sin asignar'}</span>}
+      </button>
+    );
+  });
 
   const copyDay = (from: string, to: string[]) => {
     meals.forEach(meal => {
@@ -56,13 +76,51 @@ const WeeklyMenu = () => {
 
       <div className="planner-toolbar">
         <div className="member-tabs" role="tablist">
+          <button role="tab" aria-selected={isFamily} className={`member-tab${isFamily ? ' on' : ''}`} onClick={() => setMember(FAMILY)}>
+            👨‍👩‍👧‍👦 Familia
+          </button>
           {members.map(m => (
             <button key={m.id} role="tab" aria-selected={member === m.name} className={`member-tab${member === m.name ? ' on' : ''}`} onClick={() => setMember(m.name)}>
-              {m.avatar} {m.name} <small>{filled(m.name)}</small>
+              {m.avatar} {m.name} <small>{filled(m.name)}</small>{m.role === 'child' && isMenuLocked(m.name) && <Lock size={11} />}
             </button>
           ))}
         </div>
       </div>
+
+      {memberObj?.role === 'child' && (
+        <div className={`notice${isMenuLocked(member) ? '' : ' warn'}`} style={{ marginBottom: '1rem', alignItems: 'center' }}>
+          {isMenuLocked(member) ? <Lock size={16} /> : <Unlock size={16} />}
+          <span style={{ flex: 1 }}>
+            {isMenuLocked(member)
+              ? <><b>{member} ya confirmó su semana.</b> Si quiere cambiar algo, te llega una solicitud para aprobar. Tú sí puedes editar.</>
+              : <><b>{member} aún no confirma su semana.</b> Puede elegir y cambiar libremente hasta que la confirme.</>}
+          </span>
+          {isMenuLocked(member)
+            ? <button className="btn-xs" onClick={() => unlockMenu(member)}><Unlock size={12} /> Desbloquear</button>
+            : <button className="btn-xs" onClick={() => lockMenu(member)}><Lock size={12} /> Confirmar por {member}</button>}
+        </div>
+      )}
+
+      {mealChanges.pending.length > 0 && (
+        <div className="panel" style={{ marginBottom: '1rem' }}>
+          <div className="panel-head"><h3>Cambios por aprobar</h3></div>
+          <div className="attention-list">
+            {mealChanges.pending.map(r => {
+              const d = mealChanges.describe(r);
+              return (
+                <div key={r.id} className="attention-item">
+                  <span className="attention-icon amber">{members.find(m => m.name === r.member)?.avatar}</span>
+                  <div className="attention-text"><b>{r.member}: {d.title}</b><span>{d.detail}</span></div>
+                  <div className="attention-actions">
+                    <button className="btn-xs" onClick={() => mealChanges.resolve(r.id, false)} aria-label="Rechazar cambio"><X size={13} /></button>
+                    <button className="btn-xs primary" onClick={() => mealChanges.resolve(r.id, true)}><Check size={13} /> Aprobar</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Escritorio: cuadrícula */}
       <div className="week-grid">
@@ -70,7 +128,7 @@ const WeeklyMenu = () => {
         {WEEK_DAYS.map(d => (
           <div key={d} className={`wg-head${d === today ? ' today' : ''}`}>
             {d}
-            <button className="btn-icon" style={{ padding: '2px', marginLeft: '2px' }} title={`Copiar ${d} a otros días`} aria-label={`Copiar ${d}`} onClick={() => setCopyFrom(d)}><Copy size={11} /></button>
+            {!isFamily && <button className="btn-icon" style={{ padding: '2px', marginLeft: '2px' }} title={`Copiar ${d} a otros días`} aria-label={`Copiar ${d}`} onClick={() => setCopyFrom(d)}><Copy size={11} /></button>}
           </div>
         ))}
         {meals.map(meal => (
@@ -78,9 +136,10 @@ const WeeklyMenu = () => {
             <div className="wg-meal">{MEAL_EMOJI[meal]} {meal}</div>
             {WEEK_DAYS.map(day => {
               const { slot, items } = cellContent(day, meal);
+              if (isFamily) return <div key={day} className={`wg-fam${day === today ? ' today' : ''}`}>{familyLines(day, meal, true)}</div>;
               return (
                 <div key={day}>
-                  <button className={`wg-cell${day === today ? ' today' : ''}${slot?.ate ? ' ate' : ''}`} onClick={() => setPicking({ day, meal })} aria-label={`${meal} del ${day}`}>
+                  <button className={`wg-cell${day === today ? ' today' : ''}${slot?.ate ? ' ate' : ''}`} onClick={() => pick(day, meal)} aria-label={`${meal} del ${day}`}>
                     {items.length ? (
                       <>
                         <span className="wg-emojis">{items.map(f => foodEmoji(f!)).join('')}</span>
@@ -104,12 +163,18 @@ const WeeklyMenu = () => {
           <div key={day} className="week-day">
             <div className={`week-day-head${day === today ? ' today' : ''}`}>
               <span>{day}{day === today ? ' · hoy' : ''}</span>
-              <button className="btn-icon" style={{ padding: '2px' }} aria-label={`Copiar ${day}`} onClick={() => setCopyFrom(day)}><Copy size={13} /></button>
+              {!isFamily && <button className="btn-icon" style={{ padding: '2px' }} aria-label={`Copiar ${day}`} onClick={() => setCopyFrom(day)}><Copy size={13} /></button>}
             </div>
             {meals.map(meal => {
               const { slot, items } = cellContent(day, meal);
+              if (isFamily) return (
+                <div key={meal} className="week-day-fam">
+                  <span className="wd-meal">{MEAL_EMOJI[meal]} {meal}</span>
+                  <div>{familyLines(day, meal, false)}</div>
+                </div>
+              );
               return (
-                <button key={meal} className="week-day-row" onClick={() => setPicking({ day, meal })}>
+                <button key={meal} className="week-day-row" onClick={() => pick(day, meal)}>
                   <span className="wd-meal">{MEAL_EMOJI[meal]} {meal}</span>
                   <span className="wd-food">
                     {items.length
@@ -154,8 +219,8 @@ const WeeklyMenu = () => {
         </div>
       )}
 
-      {picking && memberObj && (
-        <FoodPicker mode="parent" member={member} day={picking.day} meal={picking.meal} onClose={() => setPicking(null)} />
+      {picking && (
+        <FoodPicker mode="parent" member={picking.member} day={picking.day} meal={picking.meal} onClose={() => setPicking(null)} />
       )}
 
       {copyFrom && (
