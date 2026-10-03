@@ -1,7 +1,12 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
+import { todayKey, weekStartKey } from '../utils/dates';
+import {
+  SEED_MEMBERS, SEED_FOODS, SEED_FOOD_GROUP_LIMITS, SEED_PRODUCTS, SEED_ROUTINES,
+  SEED_CHORES, SEED_PRIZES, SEED_RULES, SEED_EVENTS,
+} from '../data/seed';
 
 // ── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -23,7 +28,10 @@ export interface Food {
   name: string;
   categories: string[];
   ingredients: Ingredient[];
+  /** Máximo de porciones por niño a la semana */
   maxPerWeek?: number;
+  /** Grupo (Dulces, Comida rápida...) con tope semanal en foodGroupLimits */
+  group?: string;
   isFavorite?: boolean;
   calories?: number;
   prepTime?: number;
@@ -60,9 +68,12 @@ export interface Chore {
   name: string;
   user: string;
   freq: string;
+  /** Derivado de lastDone: se reinicia cada día (o cada semana si freq es semanal) */
   status: 'Hecho' | 'Pendiente';
   points: number;
   routineId?: string;
+  lastDone?: string;
+  doneBy?: string;
 }
 
 export interface Routine {
@@ -87,6 +98,27 @@ export interface SchoolTask {
   completed: boolean;
 }
 
+export interface Grade {
+  id: string;
+  child: string;
+  subject: string;
+  period: string;
+  score: number;
+  date: string;
+  notes?: string;
+}
+
+export interface FamilyEvent {
+  id: string;
+  title: string;
+  date: string;
+  time?: string;
+  /** Nombres de miembros, o 'Familia' */
+  members: string[];
+  color?: string;
+  notes?: string;
+}
+
 export interface Rule {
   id: string;
   description: string;
@@ -102,6 +134,8 @@ export interface PointLog {
   appliedBy?: string;
   points: number;
   date: string;
+  /** Identifica el origen (tarea/rutina/día) para no duplicar ni dejar puntos huérfanos */
+  sourceKey?: string;
 }
 
 export interface Member {
@@ -109,6 +143,8 @@ export interface Member {
   name: string;
   role: 'parent' | 'child';
   avatar: string;
+  /** PIN de acceso. Opcional para niños. */
+  pin?: string;
 }
 
 export interface Prize {
@@ -148,30 +184,41 @@ export interface ExtraItem {
   price?: number;
 }
 
-// ── Context type ─────────────────────────────────────────────────────────────
-
-interface DataContextType {
+interface AppState {
+  members: Member[];
   foods: Food[];
+  weeklyMenu: WeeklyMenuItem[];
   chores: Chore[];
   schoolTasks: SchoolTask[];
-  weeklyMenu: WeeklyMenuItem[];
+  grades: Grade[];
+  familyEvents: FamilyEvent[];
   pointLogs: PointLog[];
   rules: Rule[];
-  members: Member[];
   routines: Routine[];
   products: Product[];
   shoppingNotes: ShoppingNote[];
   routineLogs: string[];
-  points: { [key: string]: number };
   ingredientItems: IngredientItem[];
   schoolCategories: string[];
   prizes: Prize[];
   prizeRequests: PrizeRequest[];
+  customShoppingItems: CustomShoppingItem[];
+  extraItems: ExtraItem[];
+  foodGroupLimits: Record<string, number>;
+}
+
+// ── Context type ─────────────────────────────────────────────────────────────
+
+interface DataContextType extends Omit<AppState, 'chores'> {
+  chores: Chore[];
+  points: { [key: string]: number };
+  isCloudEnabled: boolean;
 
   addFood: (food: Omit<Food, 'id'>) => void;
   updateFood: (id: string, food: Partial<Food>) => void;
   deleteFood: (id: string) => void;
   clearFoods: () => void;
+  setFoodGroupLimit: (group: string, limit: number | null) => void;
 
   addIngredientItem: (item: Omit<IngredientItem, 'id'>) => void;
   deleteIngredientItem: (id: string) => void;
@@ -186,7 +233,8 @@ interface DataContextType {
   addChore: (chore: Omit<Chore, 'id' | 'status'>) => void;
   updateChore: (id: string, chore: Partial<Chore>) => void;
   deleteChore: (id: string) => void;
-  toggleChore: (id: string) => void;
+  /** doneBy: quien la marca (para tareas de 'Familia' los puntos van a ese niño) */
+  toggleChore: (id: string, doneBy?: string) => void;
 
   addRule: (rule: Omit<Rule, 'id'>) => void;
   updateRule: (id: string, rule: Partial<Rule>) => void;
@@ -195,6 +243,7 @@ interface DataContextType {
   addPointLog: (log: Omit<PointLog, 'id' | 'date'>) => void;
   deletePointLog: (id: string) => void;
 
+  addMember: (member: Omit<Member, 'id'>) => void;
   updateMember: (id: string, member: Partial<Member>) => void;
 
   addRoutine: (routine: Omit<Routine, 'id'>) => void;
@@ -209,9 +258,16 @@ interface DataContextType {
   addSchoolTask: (task: Omit<SchoolTask, 'id' | 'completed'>) => void;
   updateSchoolTask: (id: string, task: Partial<SchoolTask>) => void;
   deleteSchoolTask: (id: string) => void;
-  toggleSchoolTask: (id: string) => void;
-
+  toggleSchoolTask: (id: string, byKid?: boolean) => void;
   updateSchoolCategories: (categories: string[]) => void;
+
+  addGrade: (grade: Omit<Grade, 'id'>) => void;
+  updateGrade: (id: string, grade: Partial<Grade>) => void;
+  deleteGrade: (id: string) => void;
+
+  addFamilyEvent: (ev: Omit<FamilyEvent, 'id'>) => void;
+  updateFamilyEvent: (id: string, ev: Partial<FamilyEvent>) => void;
+  deleteFamilyEvent: (id: string) => void;
 
   addPrize: (prize: Omit<Prize, 'id'>) => void;
   updatePrize: (id: string, prize: Partial<Prize>) => void;
@@ -221,14 +277,12 @@ interface DataContextType {
   updatePrizeRequest: (id: string, req: Partial<PrizeRequest>) => void;
   deletePrizeRequest: (id: string) => void;
 
-  customShoppingItems: CustomShoppingItem[];
   addCustomShoppingItem: (item: Omit<CustomShoppingItem, 'id' | 'checked' | 'createdAt'>) => void;
   updateCustomShoppingItem: (id: string, item: Partial<CustomShoppingItem>) => void;
   toggleCustomShoppingItem: (id: string) => void;
   deleteCustomShoppingItem: (id: string) => void;
   clearCustomShoppingItems: () => void;
 
-  extraItems: ExtraItem[];
   addExtraItem: (item: Omit<ExtraItem, 'id'>) => void;
   updateExtraItem: (id: string, item: Partial<ExtraItem>) => void;
   deleteExtraItem: (id: string) => void;
@@ -236,268 +290,338 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+const STORAGE_KEY = 'fh_state_v2';
+const ROUTINE_POINTS = 30;
+const PERFECT_DAY_POINTS = 20;
+const SCHOOL_TASK_POINTS = 10;
+
+const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const isWeekly = (freq: string) => /seman/i.test(freq);
+
+const chorePeriodKey = (c: Pick<Chore, 'freq'>, day = todayKey()) => {
+  if (!isWeekly(c.freq)) return day;
+  const [y, m, d] = day.split('-').map(Number);
+  return weekStartKey(new Date(y, m - 1, d));
+};
+
+const isChoreDone = (c: Chore) =>
+  !!c.lastDone && chorePeriodKey(c, c.lastDone) === chorePeriodKey(c);
+
+const isKidName = (members: Member[], name: string) =>
+  members.some(m => m.name === name && m.role === 'child');
+
+const seedState = (): AppState => ({
+  members: SEED_MEMBERS,
+  foods: SEED_FOODS,
+  weeklyMenu: [],
+  chores: SEED_CHORES,
+  schoolTasks: [],
+  grades: [],
+  familyEvents: SEED_EVENTS(),
+  pointLogs: [],
+  rules: SEED_RULES,
+  routines: SEED_ROUTINES,
+  products: SEED_PRODUCTS,
+  shoppingNotes: [],
+  routineLogs: [],
+  ingredientItems: [],
+  schoolCategories: ['Llevar material', 'Pagar', 'Examen', 'Evento', 'Sin clases', 'Tarea', 'Otro'],
+  prizes: SEED_PRIZES,
+  prizeRequests: [],
+  customShoppingItems: [],
+  extraItems: [],
+  foodGroupLimits: SEED_FOOD_GROUP_LIMITS,
+});
+
+/** Acepta datos guardados (local o nube) de versiones anteriores y los normaliza */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const normalize = (base: AppState, data: Record<string, any>): AppState => {
+  const next: AppState = { ...base };
+  (Object.keys(base) as (keyof AppState)[]).forEach(k => {
+    if (data[k] !== undefined && data[k] !== null) (next as unknown as Record<string, unknown>)[k] = data[k];
+  });
+  next.members = next.members.map(m => ({
+    ...m,
+    pin: m.pin || (m.role === 'parent' ? '1234' : undefined),
+  }));
+  next.weeklyMenu = next.weeklyMenu.map(m => ({ ...m, quantities: m.quantities || {} }));
+  next.schoolTasks = next.schoolTasks.map(t => {
+    const legacy = t as SchoolTask & { date?: string };
+    return {
+      ...t,
+      eventDate: t.eventDate || legacy.date || '',
+      deadline: t.deadline || t.eventDate || legacy.date || '',
+      category: t.category || 'Otro',
+    };
+  });
+  // Tareas marcadas 'Hecho' antes de existir lastDone: se respetan como hechas hoy
+  next.chores = next.chores.map(c =>
+    c.status === 'Hecho' && !c.lastDone ? { ...c, lastDone: todayKey() } : c,
+  );
+  return next;
+};
+
+const loadLocal = (): AppState => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return normalize(seedState(), JSON.parse(raw));
+  } catch { /* datos corruptos: arrancar con ejemplo */ }
+  return seedState();
+};
+
+const stripUndefined = <T,>(obj: T): T =>
+  JSON.parse(JSON.stringify(obj, (_, v) => (v === undefined ? null : v)));
+
+// ── Provider ─────────────────────────────────────────────────────────────────
+
 export const DataProvider = ({ children }: { children: ReactNode }) => {
-  const [isCloudLoaded, setIsCloudLoaded] = useState(false);
+  const [state, setState] = useState<AppState>(loadLocal);
+  const [isCloudLoaded, setIsCloudLoaded] = useState(!db);
+  const lastRemoteJson = useRef<string>('');
 
-  const [members, setMembers] = useState<Member[]>([
-    { id: '1', name: 'Raúl', role: 'parent', avatar: '👨' },
-    { id: '2', name: 'Tania', role: 'parent', avatar: '👩' },
-    { id: '3', name: 'Alan', role: 'child', avatar: '👦' },
-    { id: '4', name: 'Aria', role: 'child', avatar: '👧' },
-  ]);
-  const [foods, setFoods] = useState<Food[]>([]);
-  const [weeklyMenu, setWeeklyMenu] = useState<WeeklyMenuItem[]>([]);
-  const [chores, setChores] = useState<Chore[]>([]);
-  const [schoolTasks, setSchoolTasks] = useState<SchoolTask[]>([]);
-  const [pointLogs, setPointLogs] = useState<PointLog[]>([]);
-  const [rules, setRules] = useState<Rule[]>([
-    { id: '1', description: 'No comer la comida', points: -50, category: 'Comida' },
-    { id: '2', description: 'No sacar la basura', points: -20, category: 'Hogar' },
-    { id: '3', description: 'Ayudar a alguien', points: 30, category: 'Conducta' },
-  ]);
-  const [routines, setRoutines] = useState<Routine[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [shoppingNotes, setShoppingNotes] = useState<ShoppingNote[]>([]);
-  const [routineLogs, setRoutineLogs] = useState<string[]>([]);
-  const [ingredientItems, setIngredientItems] = useState<IngredientItem[]>([]);
-  const [schoolCategories, setSchoolCategories] = useState<string[]>([
-    'Llevar material', 'Pagar', 'Examen', 'Evento', 'Sin clases', 'Tarea', 'Otro',
-  ]);
-  const [prizes, setPrizes] = useState<Prize[]>([]);
-  const [prizeRequests, setPrizeRequests] = useState<PrizeRequest[]>([]);
-  const [customShoppingItems, setCustomShoppingItems] = useState<CustomShoppingItem[]>([]);
-  const [extraItems, setExtraItems] = useState<ExtraItem[]>([]);
-
-  // ── Firebase sync ──────────────────────────────────────────────────────────
-
+  // Escucha cambios en la nube (si Firebase está configurado)
   useEffect(() => {
-    if (!db) { setIsCloudLoaded(true); return; }
-    const unsub = onSnapshot(doc(db, 'familyhub', 'main_state'), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        if (data.members) setMembers(data.members);
-        if (data.foods) setFoods(data.foods);
-        if (data.weeklyMenu) {
-          setWeeklyMenu(data.weeklyMenu.map((m: any) => ({
-            ...m,
-            quantities: m.quantities || {},
-          })));
+    if (!db) return;
+    const unsub = onSnapshot(
+      doc(db, 'familyhub', 'main_state'),
+      (snap) => {
+        if (snap.metadata.hasPendingWrites) return; // eco de nuestra propia escritura
+        if (snap.exists()) {
+          const data = snap.data();
+          setState(prev => {
+            const merged = normalize(prev, data);
+            lastRemoteJson.current = JSON.stringify(stripUndefined(merged));
+            return merged;
+          });
         }
-        if (data.chores) setChores(data.chores);
-        if (data.schoolTasks) {
-          setSchoolTasks(data.schoolTasks.map((t: any) => ({
-            ...t,
-            eventDate: t.eventDate || t.date || '',
-            deadline: t.deadline || t.eventDate || t.date || '',
-            category: t.category || 'Otro',
-          })));
-        }
-        if (data.pointLogs) setPointLogs(data.pointLogs);
-        if (data.rules) setRules(data.rules);
-        if (data.routines) setRoutines(data.routines);
-        if (data.products) setProducts(data.products);
-        if (data.shoppingNotes) setShoppingNotes(data.shoppingNotes);
-        if (data.routineLogs) setRoutineLogs(data.routineLogs);
-        if (data.ingredientItems) setIngredientItems(data.ingredientItems);
-        if (data.schoolCategories) setSchoolCategories(data.schoolCategories);
-        if (data.prizes) setPrizes(data.prizes);
-        if (data.prizeRequests) setPrizeRequests(data.prizeRequests);
-        if (data.customShoppingItems) setCustomShoppingItems(data.customShoppingItems);
-        if (data.extraItems) setExtraItems(data.extraItems);
-      }
-      setIsCloudLoaded(true);
-    });
+        setIsCloudLoaded(true);
+      },
+      (err) => {
+        console.error('Firestore no disponible, se usa modo local', err);
+        setIsCloudLoaded(true);
+      },
+    );
     return () => unsub();
   }, []);
 
-  const sanitize = (obj: any): any =>
-    JSON.parse(JSON.stringify(obj, (_, v) => (v === undefined ? null : v)));
-
+  // Persiste localmente siempre, y en la nube cuando hay Firebase
   useEffect(() => {
     if (!isCloudLoaded) return;
-    if (db) {
-      const payload = sanitize({
-        members, foods, weeklyMenu, chores, schoolTasks, pointLogs, rules,
-        routines, products, shoppingNotes, routineLogs, ingredientItems,
-        schoolCategories, prizes, prizeRequests, customShoppingItems, extraItems,
-      });
-      setDoc(doc(db, 'familyhub', 'main_state'), payload, { merge: true }).catch(console.error);
+    const payload = stripUndefined(state);
+    const json = JSON.stringify(payload);
+    try { localStorage.setItem(STORAGE_KEY, json); } catch { /* almacenamiento lleno o bloqueado */ }
+    if (db && json !== lastRemoteJson.current) {
+      lastRemoteJson.current = json;
+      setDoc(doc(db, 'familyhub', 'main_state'), payload).catch(console.error);
     }
-  }, [
-    members, foods, weeklyMenu, chores, schoolTasks, pointLogs, rules,
-    routines, products, shoppingNotes, routineLogs, ingredientItems,
-    schoolCategories, prizes, prizeRequests, customShoppingItems, extraItems, isCloudLoaded,
-  ]);
+  }, [state, isCloudLoaded]);
+
+  // ── Helpers de actualización ───────────────────────────────────────────────
+
+  const patch = (fn: (s: AppState) => Partial<AppState>) =>
+    setState(s => ({ ...s, ...fn(s) }));
+
+  type ListKey = {
+    [K in keyof AppState]: AppState[K] extends { id: string }[] ? K : never
+  }[keyof AppState];
+
+  const addTo = <K extends ListKey>(key: K, item: Omit<AppState[K][number], 'id'>) =>
+    patch(s => ({ [key]: [...s[key], { ...item, id: uid() }] }) as Partial<AppState>);
+  const updateIn = <K extends ListKey>(key: K, id: string, changes: Partial<AppState[K][number]>) =>
+    patch(s => ({ [key]: (s[key] as { id: string }[]).map(x => (x.id === id ? { ...x, ...changes } : x)) }) as Partial<AppState>);
+  const removeFrom = <K extends ListKey>(key: K, id: string) =>
+    patch(s => ({ [key]: (s[key] as { id: string }[]).filter(x => x.id !== id) }) as Partial<AppState>);
+
+  const newLog = (l: Omit<PointLog, 'id' | 'date'>): PointLog =>
+    ({ ...l, id: uid(), date: new Date().toISOString() });
 
   // ── Computed ───────────────────────────────────────────────────────────────
 
-  const points = members.reduce((acc, m) => {
-    acc[m.name] = pointLogs
+  const chores = state.chores.map(c => ({ ...c, status: isChoreDone(c) ? 'Hecho' : 'Pendiente' } as Chore));
+
+  const points = state.members.reduce((acc, m) => {
+    acc[m.name] = state.pointLogs
       .filter(l => l.member === m.name)
       .reduce((sum, l) => sum + l.points, 0);
     return acc;
   }, {} as { [key: string]: number });
 
-  // ── CRUD ───────────────────────────────────────────────────────────────────
+  // ── Acciones con lógica ────────────────────────────────────────────────────
 
-  const addFood = (f: Omit<Food, 'id'>) =>
-    setFoods(prev => [...prev, { ...f, id: `${Date.now()}-${Math.random().toString(36).slice(2)}` }]);
-  const updateFood = (id: string, f: Partial<Food>) =>
-    setFoods(foods.map(x => (x.id === id ? { ...x, ...f } as Food : x)));
-  const deleteFood = (id: string) => setFoods(foods.filter(x => x.id !== id));
-  const clearFoods = () => { setFoods([]); setIngredientItems([]); };
+  const toggleChore = (id: string, doneBy?: string) => patch(s => {
+    const chore = s.chores.find(c => c.id === id);
+    if (!chore) return {};
+    const key = `chore_${id}_${chorePeriodKey(chore)}`;
+    if (isChoreDone(chore)) {
+      return {
+        chores: s.chores.map(c => (c.id === id ? { ...c, lastDone: undefined, doneBy: undefined } : c)),
+        pointLogs: s.pointLogs.filter(l => l.sourceKey !== key),
+      };
+    }
+    const earner = isKidName(s.members, chore.user)
+      ? chore.user
+      : doneBy && isKidName(s.members, doneBy) ? doneBy : null;
+    const alreadyLogged = s.pointLogs.some(l => l.sourceKey === key);
+    return {
+      chores: s.chores.map(c => (c.id === id ? { ...c, lastDone: todayKey(), doneBy } : c)),
+      pointLogs: earner && !alreadyLogged
+        ? [...s.pointLogs, newLog({ member: earner, description: `Tarea: ${chore.name}`, points: chore.points, sourceKey: key })]
+        : s.pointLogs,
+    };
+  });
 
-  const addIngredientItem = (item: Omit<IngredientItem, 'id'>) =>
-    setIngredientItems([...ingredientItems, { ...item, id: Date.now().toString() }]);
-  const deleteIngredientItem = (id: string) =>
-    setIngredientItems(ingredientItems.filter(x => x.id !== id));
+  const toggleRoutineTask = (rid: string, idx: number, memberName: string) => patch(s => {
+    const today = todayKey();
+    const key = `${today}_${rid}_${idx}`;
+    const routine = s.routines.find(r => r.id === rid);
+    const routineLogs = s.routineLogs.includes(key)
+      ? s.routineLogs.filter(x => x !== key)
+      : [...s.routineLogs, key];
+    if (!routine) return { routineLogs };
 
-  const addProduct = (p: Omit<Product, 'id'>) =>
-    setProducts([...products, { ...p, id: Date.now().toString() }]);
-  const updateProduct = (id: string, p: Partial<Product>) =>
-    setProducts(products.map(x => (x.id === id ? { ...x, ...p } as Product : x)));
-  const deleteProduct = (id: string) => setProducts(products.filter(x => x.id !== id));
+    const isComplete = (r: Routine, logs: string[]) =>
+      r.tasks.length > 0 && r.tasks.every((_, i) => logs.includes(`${today}_${r.id}_${i}`));
 
-  const addChore = (c: Omit<Chore, 'id' | 'status'>) =>
-    setChores([...chores, { ...c, id: Date.now().toString(), status: 'Pendiente' }]);
-  const updateChore = (id: string, c: Partial<Chore>) =>
-    setChores(chores.map(x => (x.id === id ? { ...x, ...c } as Chore : x)));
-  const deleteChore = (id: string) => setChores(chores.filter(x => x.id !== id));
-  const toggleChore = (id: string) => {
-    setChores(chores.map(c => {
-      if (c.id !== id) return c;
-      const isDone = c.status === 'Pendiente';
-      if (isDone && !['Raúl', 'Tania', 'Familia'].includes(c.user)) {
-        addPointLog({ member: c.user, description: `Tarea: ${c.name}`, points: c.points });
-      }
-      return { ...c, status: isDone ? 'Hecho' : 'Pendiente' };
-    }));
-  };
+    const routineKey = `routine_${today}_${rid}`;
+    const perfectKey = `perfect_${today}_${memberName}`;
+    let pointLogs = s.pointLogs.filter(l => l.sourceKey !== routineKey && l.sourceKey !== perfectKey);
+    const prevRoutineLog = s.pointLogs.find(l => l.sourceKey === routineKey);
+    const prevPerfectLog = s.pointLogs.find(l => l.sourceKey === perfectKey);
 
-  const addRule = (r: Omit<Rule, 'id'>) =>
-    setRules([...rules, { ...r, id: Date.now().toString() }]);
-  const updateRule = (id: string, r: Partial<Rule>) =>
-    setRules(rules.map(x => (x.id === id ? { ...x, ...r } as Rule : x)));
-  const deleteRule = (id: string) => setRules(rules.filter(x => x.id !== id));
+    if (isComplete(routine, routineLogs)) {
+      pointLogs.push(prevRoutineLog || newLog({ member: memberName, description: `Rutina: ${routine.name}`, points: ROUTINE_POINTS, sourceKey: routineKey }));
+    }
+    const mine = s.routines.filter(r => r.member === memberName && r.tasks.length > 0);
+    if (mine.length > 1 && mine.every(r => isComplete(r, routineLogs))) {
+      pointLogs.push(prevPerfectLog || newLog({ member: memberName, description: '¡Día perfecto! Todas las rutinas', points: PERFECT_DAY_POINTS, sourceKey: perfectKey }));
+    }
+    // Solo niños ganan puntos
+    if (!isKidName(s.members, memberName)) pointLogs = s.pointLogs;
+    // Limpia registros de rutinas de más de 60 días
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 60);
+    const cutoffKey = cutoff.toLocaleDateString('en-CA');
+    return { routineLogs: routineLogs.filter(k => k.slice(0, 10) >= cutoffKey), pointLogs };
+  });
 
-  const addPointLog = (l: Omit<PointLog, 'id' | 'date'>) =>
-    setPointLogs([...pointLogs, { ...l, id: Date.now().toString(), date: new Date().toISOString() }]);
-  const deletePointLog = (id: string) =>
-    setPointLogs(pointLogs.filter(x => x.id !== id));
-
-  const updateMember = (id: string, m: Partial<Member>) =>
-    setMembers(members.map(item => (item.id === id ? { ...item, ...m } as Member : item)));
-
-  const addRoutine = (r: Omit<Routine, 'id'>) =>
-    setRoutines([...routines, { ...r, id: Date.now().toString() }]);
-  const updateRoutine = (id: string, r: Partial<Routine>) =>
-    setRoutines(routines.map(x => (x.id === id ? { ...x, ...r } as Routine : x)));
-  const deleteRoutine = (id: string) => setRoutines(routines.filter(x => x.id !== id));
-
-  const toggleRoutineTask = (rid: string, idx: number, mName: string) => {
-    const todayStr = new Date().toLocaleDateString('en-CA');
-    const key = `${todayStr}_${rid}_${idx}`;
-    setRoutineLogs(prev => {
-      if (prev.includes(key)) return prev.filter(x => x !== key);
-      const next = [...prev, key];
-      const routine = routines.find(r => r.id === rid);
-      if (routine) {
-        const done = next.filter(k => k.startsWith(`${todayStr}_${rid}_`)).length;
-        if (done === routine.tasks.length) {
-          addPointLog({ member: mName, description: `Rutina: ${routine.name}`, points: 30 });
-        }
-      }
-      return next;
-    });
-  };
+  const toggleSchoolTask = (id: string, byKid = false) => patch(s => {
+    const task = s.schoolTasks.find(t => t.id === id);
+    if (!task) return {};
+    const key = `school_${id}`;
+    const completed = !task.completed;
+    let pointLogs = s.pointLogs.filter(l => l.sourceKey !== key);
+    if (completed && byKid && isKidName(s.members, task.child)) {
+      pointLogs = [...pointLogs, newLog({ member: task.child, description: `Escuela: ${task.title}`, points: SCHOOL_TASK_POINTS, sourceKey: key })];
+    }
+    return {
+      schoolTasks: s.schoolTasks.map(t => (t.id === id ? { ...t, completed } : t)),
+      pointLogs,
+    };
+  });
 
   const assignMeal = (
-    d: string,
-    m: string,
-    ids: string[],
-    mem: string,
+    d: string, m: string, ids: string[], mem: string,
     quantities: { [fid: string]: number } = {},
-  ) => {
-    setWeeklyMenu(prev => {
-      const filtered = prev.filter(x => !(x.day === d && x.meal === m && x.member === mem));
-      if (!ids.length) return filtered;
-      return [...filtered, { id: Date.now().toString(), day: d, meal: m, foodIds: ids, quantities, member: mem, ate: false }];
-    });
-  };
-  const toggleAte = (id: string) =>
-    setWeeklyMenu(weeklyMenu.map(x => (x.id === id ? { ...x, ate: !x.ate } : x)));
-  const clearWeeklyMenu = () => setWeeklyMenu([]);
+  ) => patch(s => {
+    const filtered = s.weeklyMenu.filter(x => !(x.day === d && x.meal === m && x.member === mem));
+    if (!ids.length) return { weeklyMenu: filtered };
+    return { weeklyMenu: [...filtered, { id: uid(), day: d, meal: m, foodIds: ids, quantities, member: mem, ate: false }] };
+  });
 
-  const addSchoolTask = (t: Omit<SchoolTask, 'id' | 'completed'>) =>
-    setSchoolTasks(prev => [...prev, { ...t, id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, completed: false }]);
-  const updateSchoolTask = (id: string, t: Partial<SchoolTask>) =>
-    setSchoolTasks(schoolTasks.map(x => (x.id === id ? { ...x, ...t } as SchoolTask : x)));
-  const deleteSchoolTask = (id: string) =>
-    setSchoolTasks(schoolTasks.filter(x => x.id !== id));
-  const toggleSchoolTask = (id: string) =>
-    setSchoolTasks(schoolTasks.map(x => (x.id === id ? { ...x, completed: !x.completed } : x)));
-
-  const updateSchoolCategories = (cats: string[]) => setSchoolCategories(cats);
-
-  const addPrize = (p: Omit<Prize, 'id'>) =>
-    setPrizes([...prizes, { ...p, id: Date.now().toString() }]);
-  const updatePrize = (id: string, p: Partial<Prize>) =>
-    setPrizes(prizes.map(x => (x.id === id ? { ...x, ...p } as Prize : x)));
-  const deletePrize = (id: string) => setPrizes(prizes.filter(x => x.id !== id));
-
-  const addPrizeRequest = (req: Omit<PrizeRequest, 'id' | 'date' | 'status'>) =>
-    setPrizeRequests([...prizeRequests, { ...req, id: Date.now().toString(), date: new Date().toISOString(), status: 'pending' }]);
-  const updatePrizeRequest = (id: string, req: Partial<PrizeRequest>) =>
-    setPrizeRequests(prizeRequests.map(x => (x.id === id ? { ...x, ...req } as PrizeRequest : x)));
-  const deletePrizeRequest = (id: string) =>
-    setPrizeRequests(prizeRequests.filter(x => x.id !== id));
-
-  const addCustomShoppingItem = (item: Omit<CustomShoppingItem, 'id' | 'checked' | 'createdAt'>) =>
-    setCustomShoppingItems(prev => [...prev, { ...item, id: Date.now().toString(), checked: false, createdAt: new Date().toISOString() }]);
-  const updateCustomShoppingItem = (id: string, item: Partial<CustomShoppingItem>) =>
-    setCustomShoppingItems(prev => prev.map(x => x.id === id ? { ...x, ...item } : x));
-  const toggleCustomShoppingItem = (id: string) =>
-    setCustomShoppingItems(prev => prev.map(x => x.id === id ? { ...x, checked: !x.checked } : x));
-  const deleteCustomShoppingItem = (id: string) =>
-    setCustomShoppingItems(prev => prev.filter(x => x.id !== id));
-  const clearCustomShoppingItems = () => setCustomShoppingItems([]);
-
-  const addExtraItem = (item: Omit<ExtraItem, 'id'>) =>
-    setExtraItems(prev => [...prev, { ...item, id: `${Date.now()}-${Math.random().toString(36).slice(2)}` }]);
-  const updateExtraItem = (id: string, item: Partial<ExtraItem>) =>
-    setExtraItems(prev => prev.map(x => x.id === id ? { ...x, ...item } : x));
-  const deleteExtraItem = (id: string) =>
-    setExtraItems(prev => prev.filter(x => x.id !== id));
+  const setFoodGroupLimit = (group: string, limit: number | null) => patch(s => {
+    const next = { ...s.foodGroupLimits };
+    if (limit === null || Number.isNaN(limit)) delete next[group];
+    else next[group] = limit;
+    return { foodGroupLimits: next };
+  });
 
   return (
     <DataContext.Provider value={{
-      foods, chores, schoolTasks, weeklyMenu, pointLogs, rules, members, routines,
-      products, shoppingNotes, points, routineLogs, ingredientItems, schoolCategories,
-      prizes, prizeRequests,
-      addFood, updateFood, deleteFood, clearFoods,
-      addIngredientItem, deleteIngredientItem,
-      addProduct, updateProduct, deleteProduct,
-      addShoppingNote: (t) => setShoppingNotes([...shoppingNotes, { id: Date.now().toString(), text: t, createdAt: new Date().toISOString() }]),
-      deleteShoppingNote: (id) => setShoppingNotes(shoppingNotes.filter(x => x.id !== id)),
-      addChore, updateChore, deleteChore, toggleChore,
-      addRule, updateRule, deleteRule,
-      addPointLog, deletePointLog,
-      updateMember,
-      addRoutine, updateRoutine, deleteRoutine, toggleRoutineTask,
-      assignMeal, toggleAte, clearWeeklyMenu,
-      addSchoolTask, updateSchoolTask, deleteSchoolTask, toggleSchoolTask,
-      updateSchoolCategories,
-      addPrize, updatePrize, deletePrize,
-      addPrizeRequest, updatePrizeRequest, deletePrizeRequest,
-      customShoppingItems,
-      addCustomShoppingItem, updateCustomShoppingItem, toggleCustomShoppingItem, deleteCustomShoppingItem, clearCustomShoppingItems,
-      extraItems, addExtraItem, updateExtraItem, deleteExtraItem,
+      ...state,
+      chores,
+      points,
+      isCloudEnabled: !!db,
+
+      addFood: (f) => addTo('foods', f),
+      updateFood: (id, f) => updateIn('foods', id, f),
+      deleteFood: (id) => removeFrom('foods', id),
+      clearFoods: () => patch(() => ({ foods: [], ingredientItems: [] })),
+      setFoodGroupLimit,
+
+      addIngredientItem: (i) => addTo('ingredientItems', i),
+      deleteIngredientItem: (id) => removeFrom('ingredientItems', id),
+
+      addProduct: (p) => addTo('products', p),
+      updateProduct: (id, p) => updateIn('products', id, p),
+      deleteProduct: (id) => removeFrom('products', id),
+
+      addShoppingNote: (text) => addTo('shoppingNotes', { text, createdAt: new Date().toISOString() }),
+      deleteShoppingNote: (id) => removeFrom('shoppingNotes', id),
+
+      addChore: (c) => addTo('chores', { ...c, status: 'Pendiente' }),
+      updateChore: (id, c) => updateIn('chores', id, c),
+      deleteChore: (id) => removeFrom('chores', id),
+      toggleChore,
+
+      addRule: (r) => addTo('rules', r),
+      updateRule: (id, r) => updateIn('rules', id, r),
+      deleteRule: (id) => removeFrom('rules', id),
+
+      addPointLog: (l) => patch(s => ({ pointLogs: [...s.pointLogs, newLog(l)] })),
+      deletePointLog: (id) => removeFrom('pointLogs', id),
+
+      addMember: (m) => addTo('members', m),
+      updateMember: (id, m) => updateIn('members', id, m),
+
+      addRoutine: (r) => addTo('routines', r),
+      updateRoutine: (id, r) => updateIn('routines', id, r),
+      deleteRoutine: (id) => removeFrom('routines', id),
+      toggleRoutineTask,
+
+      assignMeal,
+      toggleAte: (id) => patch(s => ({ weeklyMenu: s.weeklyMenu.map(x => (x.id === id ? { ...x, ate: !x.ate } : x)) })),
+      clearWeeklyMenu: () => patch(() => ({ weeklyMenu: [] })),
+
+      addSchoolTask: (t) => addTo('schoolTasks', { ...t, completed: false }),
+      updateSchoolTask: (id, t) => updateIn('schoolTasks', id, t),
+      deleteSchoolTask: (id) => removeFrom('schoolTasks', id),
+      toggleSchoolTask,
+      updateSchoolCategories: (cats) => patch(() => ({ schoolCategories: cats })),
+
+      addGrade: (g) => addTo('grades', g),
+      updateGrade: (id, g) => updateIn('grades', id, g),
+      deleteGrade: (id) => removeFrom('grades', id),
+
+      addFamilyEvent: (e) => addTo('familyEvents', e),
+      updateFamilyEvent: (id, e) => updateIn('familyEvents', id, e),
+      deleteFamilyEvent: (id) => removeFrom('familyEvents', id),
+
+      addPrize: (p) => addTo('prizes', p),
+      updatePrize: (id, p) => updateIn('prizes', id, p),
+      deletePrize: (id) => removeFrom('prizes', id),
+
+      addPrizeRequest: (r) => addTo('prizeRequests', { ...r, date: new Date().toISOString(), status: 'pending' }),
+      updatePrizeRequest: (id, r) => updateIn('prizeRequests', id, r),
+      deletePrizeRequest: (id) => removeFrom('prizeRequests', id),
+
+      addCustomShoppingItem: (i) => addTo('customShoppingItems', { ...i, checked: false, createdAt: new Date().toISOString() }),
+      updateCustomShoppingItem: (id, i) => updateIn('customShoppingItems', id, i),
+      toggleCustomShoppingItem: (id) => patch(s => ({ customShoppingItems: s.customShoppingItems.map(x => (x.id === id ? { ...x, checked: !x.checked } : x)) })),
+      deleteCustomShoppingItem: (id) => removeFrom('customShoppingItems', id),
+      clearCustomShoppingItems: () => patch(() => ({ customShoppingItems: [] })),
+
+      addExtraItem: (i) => addTo('extraItems', i),
+      updateExtraItem: (id, i) => updateIn('extraItems', id, i),
+      deleteExtraItem: (id) => removeFrom('extraItems', id),
     }}>
       {children}
     </DataContext.Provider>
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useData = () => {
   const context = useContext(DataContext);
   if (!context) throw new Error('useData must be used within DataProvider');

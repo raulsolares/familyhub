@@ -63,7 +63,7 @@ const Rewards = () => {
   const handlePrizeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const data = { name: prizeName, description: prizeDesc, points: prizePoints, imageUrl: prizeImage.trim(), available: prizeAvailable };
-    editingPrize ? updatePrize(editingPrize.id, data) : addPrize(data);
+    if (editingPrize) updatePrize(editingPrize.id, data); else addPrize(data);
     resetPrizeForm();
   };
 

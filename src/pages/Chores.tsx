@@ -100,7 +100,10 @@ const Chores = () => {
               <div className="grid-2">
                 <div className="form-group">
                   <label className="form-label">Frecuencia</label>
-                  <input value={freq} onChange={e => setFreq(e.target.value)} placeholder="Ej: Diario, Lunes, Mar/Jue" />
+                  <select value={freq} onChange={e => setFreq(e.target.value)}>
+                    {Array.from(new Set(['Diario', 'Lunes a Viernes', 'Fin de semana', 'Semanal', freq])).map(f => <option key={f}>{f}</option>)}
+                  </select>
+                  <span className="text-xs text-muted">Diarias se reinician cada día; semanales cada lunes</span>
                 </div>
                 <div className="form-group">
                   <label className="form-label">Puntos al completar</label>
@@ -128,7 +131,7 @@ const Chores = () => {
           )}
           {pending.map(chore => (
             <div key={chore.id} className="card" style={{ padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
-              <button onClick={() => toggleChore(chore.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}>
+              <button onClick={() => toggleChore(chore.id, currentUser?.name)} style={{ background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}>
                 <Circle size={22} color="var(--border)" strokeWidth={2} />
               </button>
               <div style={{ flex: 1 }}>
@@ -154,12 +157,12 @@ const Chores = () => {
       {done.length > 0 && (
         <div>
           <h3 style={{ fontWeight: '700', fontSize: '0.875rem', color: 'var(--p-text-muted)', marginBottom: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Completadas hoy ({done.length})
+            Completadas ({done.length})
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {done.map(chore => (
               <div key={chore.id} style={{ padding: '0.875rem 1.25rem', background: 'var(--p-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', display: 'flex', alignItems: 'center', gap: '0.875rem', opacity: 0.65 }}>
-                <button onClick={() => toggleChore(chore.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}>
+                <button onClick={() => toggleChore(chore.id, currentUser?.name)} style={{ background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}>
                   <CheckCircle2 size={22} color="var(--success)" />
                 </button>
                 <p style={{ fontWeight: '600', fontSize: '0.9rem', textDecoration: 'line-through', color: 'var(--p-text-muted)', flex: 1 }}>{chore.name}</p>

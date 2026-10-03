@@ -18,22 +18,14 @@ interface UserContextType {
   viewMode: Role;          // lo que se muestra (padres pueden cambiar a 'child')
   isKidView: boolean;      // true cuando padre está en vista niño
   user: User | null;
-  login: (username: string, password: string) => boolean;
+  /** El PIN se valida en la pantalla de acceso, contra los datos de la familia */
+  login: (member: { id: string; name: string; avatar: string; role: Role }) => void;
   logout: () => void;
   isLoggedIn: boolean;
   updateTheme: (theme: Theme) => void;
   enterKidView: () => void;
   exitKidView: () => void;
 }
-
-const USERS: Record<string, { name: string; avatar: string; role: Role; theme: Theme }> = {
-  papa:  { name: 'Raúl',  avatar: '👨', role: 'parent', theme: 'light' },
-  raul:  { name: 'Raúl',  avatar: '👨', role: 'parent', theme: 'light' },
-  mama:  { name: 'Tania', avatar: '👩', role: 'parent', theme: 'light' },
-  tania: { name: 'Tania', avatar: '👩', role: 'parent', theme: 'light' },
-  alan:  { name: 'Alan',  avatar: '👦', role: 'child',  theme: 'fun'   },
-  aria:  { name: 'Aria',  avatar: '👧', role: 'child',  theme: 'fun'   },
-};
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
@@ -47,16 +39,20 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   });
   const [isKidView, setIsKidView] = useState(false);
 
-  const login = (username: string, password: string): boolean => {
-    const profile = USERS[username.toLowerCase()];
-    if (!profile || password !== '1234') return false;
-    const newUser: User = { id: username, username: username.toLowerCase(), ...profile };
+  const login = (member: { id: string; name: string; avatar: string; role: Role }) => {
+    const newUser: User = {
+      id: member.id,
+      username: member.name.toLowerCase(),
+      name: member.name,
+      avatar: member.avatar,
+      role: member.role,
+      theme: member.role === 'child' ? 'fun' : 'light',
+    };
     setUser(newUser);
     setIsLoggedIn(true);
     setIsKidView(false);
     localStorage.setItem('fh_auth', 'true');
     localStorage.setItem('fh_user', JSON.stringify(newUser));
-    return true;
   };
 
   const logout = () => {
@@ -108,6 +104,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useUser = () => {
   const context = useContext(UserContext);
   if (!context) throw new Error('useUser must be used within UserProvider');

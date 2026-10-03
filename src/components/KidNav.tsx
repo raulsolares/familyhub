@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Home, CheckSquare, GraduationCap, Trophy, Clock, EyeOff, LogOut } from 'lucide-react';
+import { Home, CheckSquare, GraduationCap, Trophy, Clock, EyeOff, LogOut, CalendarDays } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 
 const navItems = [
@@ -7,6 +7,7 @@ const navItems = [
   { to: '/chores',   icon: CheckSquare,  label: 'Tareas' },
   { to: '/routines', icon: Clock,        label: 'Rutinas' },
   { to: '/school',   icon: GraduationCap, label: 'Escuela' },
+  { to: '/calendar', icon: CalendarDays,  label: 'Agenda' },
   { to: '/rewards',  icon: Trophy,       label: 'Premios' },
 ];
 

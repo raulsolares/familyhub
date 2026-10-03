@@ -6,7 +6,9 @@ import type { Food, Ingredient } from '../context/DataContext';
 
 const FoodManager = () => {
   const { role } = useUser();
-  const { foods, addFood, deleteFood, updateFood, ingredientItems, addIngredientItem, weeklyMenu, members } = useData();
+  const { foods, addFood, deleteFood, updateFood, ingredientItems, addIngredientItem, weeklyMenu, members, foodGroupLimits, setFoodGroupLimit } = useData();
+  const [newGroup, setNewGroup] = useState('');
+  const [newGroupLimit, setNewGroupLimit] = useState<number | ''>('');
   const [activeTab, setActiveTab] = useState<'catalogo' | 'estadisticas'>('catalogo');
   const [activeIngSuggest, setActiveIngSuggest] = useState<number | null>(null);
   const suggestRef = useRef<HTMLDivElement>(null);
@@ -21,10 +23,12 @@ const FoodManager = () => {
   const [ingredients, setIngredients] = useState<Ingredient[]>([{ name: '', amount: 0, unit: 'pzas' }]);
   const [isFavorite, setIsFavorite] = useState(false);
   const [maxPerWeek, setMaxPerWeek] = useState<number | ''>('');
+  const [group, setGroup] = useState('');
   const [calories, setCalories] = useState<number | ''>('');
   const [prepTime, setPrepTime] = useState<number | ''>('');
 
   const allCategories = ['Desayuno', 'Snack', 'Lunch', 'Comida', 'Cena', 'Merienda'];
+  const allGroups = Array.from(new Set([...foods.map(f => f.group).filter((g): g is string => !!g), ...Object.keys(foodGroupLimits)])).sort();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,6 +46,7 @@ const FoodManager = () => {
       ingredients: validIngredients,
       isFavorite,
       maxPerWeek: maxPerWeek ? Number(maxPerWeek) : undefined,
+      group: group.trim() || undefined,
       calories: calories ? Number(calories) : undefined,
       prepTime: prepTime ? Number(prepTime) : undefined,
     };
@@ -59,6 +64,7 @@ const FoodManager = () => {
     setIngredients([{ name: '', amount: 0, unit: 'pzas' }]);
     setIsFavorite(false);
     setMaxPerWeek('');
+    setGroup('');
     setCalories('');
     setPrepTime('');
     setEditingFood(null);
@@ -72,6 +78,7 @@ const FoodManager = () => {
     setIngredients(food.ingredients);
     setIsFavorite(food.isFavorite || false);
     setMaxPerWeek(food.maxPerWeek || '');
+    setGroup(food.group || '');
     setCalories(food.calories || '');
     setPrepTime(food.prepTime || '');
     setShowForm(true);
@@ -194,9 +201,18 @@ const FoodManager = () => {
                   <input value={calories} onChange={(e) => setCalories(e.target.value === '' ? '' : Number(e.target.value))} type="number" placeholder="Kcal" style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border)' }} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', marginBottom: '0.4rem' }}>Límite /Semana</label>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', marginBottom: '0.4rem' }}>Límite por niño /semana</label>
                   <input value={maxPerWeek} onChange={(e) => setMaxPerWeek(e.target.value === '' ? '' : Number(e.target.value))} type="number" placeholder="Veces" style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border)' }} />
                 </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Grupo (para topes semanales)</label>
+                <input list="fh-food-groups" value={group} onChange={e => setGroup(e.target.value)} placeholder="Ej: Dulces, Comida rápida, Proteína" />
+                <datalist id="fh-food-groups">{allGroups.map(g => <option key={g} value={g} />)}</datalist>
+                {group && foodGroupLimits[group] !== undefined && (
+                  <span className="text-xs text-muted">Este grupo tiene tope de {foodGroupLimits[group]} por niño a la semana</span>
+                )}
               </div>
 
               <div>
@@ -265,6 +281,37 @@ const FoodManager = () => {
       {/* ── TAB: CATÁLOGO ── */}
       {activeTab === 'catalogo' && (
         <>
+          {role === 'parent' && (
+            <div className="card" style={{ marginBottom: '1.5rem' }}>
+              <h3 className="card-title" style={{ marginBottom: '0.375rem' }}><AlertCircle size={16} color="var(--warning)" /> Topes semanales por grupo</h3>
+              <p className="text-xs text-muted" style={{ marginBottom: '0.875rem' }}>
+                Cuántas porciones de cada grupo puede elegir cada niño por semana. También puedes poner un límite a un platillo específico al editarlo.
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.875rem' }}>
+                {allGroups.map(g => (
+                  <div key={g} style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.375rem 0.625rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--p-background)' }}>
+                    <span style={{ fontWeight: 700, fontSize: '0.8rem' }}>{g}</span>
+                    <input
+                      type="number" min="0" aria-label={`Tope semanal de ${g}`}
+                      value={foodGroupLimits[g] ?? ''}
+                      placeholder="∞"
+                      onChange={e => setFoodGroupLimit(g, e.target.value === '' ? null : Number(e.target.value))}
+                      style={{ width: '56px', padding: '0.25rem 0.375rem' }}
+                    />
+                    <span className="text-xs text-muted">/sem</span>
+                  </div>
+                ))}
+              </div>
+              <form
+                onSubmit={e => { e.preventDefault(); if (newGroup.trim() && newGroupLimit !== '') { setFoodGroupLimit(newGroup.trim(), Number(newGroupLimit)); setNewGroup(''); setNewGroupLimit(''); } }}
+                style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}
+              >
+                <input value={newGroup} onChange={e => setNewGroup(e.target.value)} placeholder="Nuevo grupo (ej: Refrescos)" style={{ flex: 1, minWidth: '160px' }} />
+                <input type="number" min="0" value={newGroupLimit} onChange={e => setNewGroupLimit(e.target.value === '' ? '' : Number(e.target.value))} placeholder="Tope" style={{ width: '80px' }} />
+                <button type="submit" className="btn-secondary">Agregar</button>
+              </form>
+            </div>
+          )}
           <div className="card" style={{ marginBottom: '2rem' }}>
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
               <div style={{ flex: 1, position: 'relative' }}>
@@ -293,11 +340,12 @@ const FoodManager = () => {
                       ))}
                     </div>
                     <h3 style={{ fontWeight: '800', fontSize: '1.25rem' }}>{food.name}</h3>
-                    {(food.calories || food.prepTime || food.maxPerWeek) && (
+                    {(food.calories || food.prepTime || food.maxPerWeek || food.group) && (
                       <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.3rem', fontSize: '0.75rem', color: 'var(--p-text-muted)', fontWeight: '600' }}>
                         {food.prepTime && <span><Clock size={10} /> {food.prepTime} min</span>}
                         {food.calories && <span><Flame size={10} color="#f97316" /> {food.calories} kcal</span>}
                         {food.maxPerWeek && <span style={{ color: '#ef4444' }}><AlertCircle size={10} /> Max {food.maxPerWeek}/sem</span>}
+                        {food.group && <span>· {food.group}</span>}
                       </div>
                     )}
                   </div>

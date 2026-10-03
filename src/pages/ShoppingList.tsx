@@ -93,7 +93,7 @@ const ShoppingList = () => {
   const handleProductSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const payload = { name: pName, price: pPrice, defaultQty: pQty, unit: pUnit, category: pCategory };
-    editingProduct ? updateProduct(editingProduct.id, payload) : addProduct(payload);
+    if (editingProduct) updateProduct(editingProduct.id, payload); else addProduct(payload);
     setPName(''); setPPrice(0); setPQty(1); setEditingProduct(null); setShowProductForm(false);
   };
 
@@ -101,7 +101,7 @@ const ShoppingList = () => {
     e.preventDefault();
     if (!eName.trim()) return;
     const payload = { name: eName.trim(), unit: eUnit, category: eCategory, price: ePrice ? Number(ePrice) : undefined };
-    editingExtra ? updateExtraItem(editingExtra.id, payload) : addExtraItem(payload);
+    if (editingExtra) updateExtraItem(editingExtra.id, payload); else addExtraItem(payload);
     setEName(''); setEUnit('pzas'); setECategory('Limpieza'); setEPrice(''); setEditingExtra(null); setShowExtraForm(false);
   };
 

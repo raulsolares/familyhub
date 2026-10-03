@@ -3,6 +3,8 @@ import { Clock, Calendar, X, Plus, Tag, CheckCircle2, Circle, Edit2, Trash2, Set
 import { useUser } from '../context/UserContext';
 import { useData } from '../context/DataContext';
 import type { SchoolTask } from '../context/DataContext';
+import { daysUntil } from '../utils/dates';
+import GradesPanel from '../components/GradesPanel';
 
 const categoryColors: Record<string, { bg: string; text: string }> = {
   'Llevar material': { bg: '#eff6ff', text: '#1d4ed8' },
@@ -17,14 +19,11 @@ const categoryColors: Record<string, { bg: string; text: string }> = {
 const getCategoryStyle = (cat: string) =>
   categoryColors[cat] || { bg: '#f1f5f9', text: '#475569' };
 
-const getDaysLeft = (dateStr: string) => {
-  if (!dateStr) return 9999;
-  const today = new Date(); today.setHours(0,0,0,0);
-  return Math.ceil((new Date(dateStr).getTime() - today.getTime()) / 86400000);
-};
+const getDaysLeft = (dateStr: string) => daysUntil(dateStr);
 
 const SchoolHub = () => {
-  const { role } = useUser();
+  const { role, viewMode, user } = useUser();
+  const isKid = viewMode === 'child';
   const {
     schoolTasks, addSchoolTask, updateSchoolTask, deleteSchoolTask,
     toggleSchoolTask, members, schoolCategories, updateSchoolCategories,
@@ -82,16 +81,16 @@ const SchoolHub = () => {
 
   const pendingTasks = schoolTasks
     .filter(t => !t.completed)
-    .filter(t => filterChild === 'Todos' || t.child === filterChild)
+    .filter(t => (isKid ? t.child === user?.name : filterChild === 'Todos' || t.child === filterChild))
     .filter(t => filterCat === 'Todas' || t.category === filterCat)
     .map(t => ({ ...t, daysLeft: getDaysLeft(t.deadline || t.eventDate) }))
     .sort((a, b) => a.daysLeft - b.daysLeft);
 
-  const doneTasks = schoolTasks.filter(t => t.completed);
+  const doneTasks = schoolTasks.filter(t => t.completed && (!isKid || t.child === user?.name));
 
   return (
     <div>
-      <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem' }}>
         <div>
           <h1 className="page-title">Módulo Escolar</h1>
           <p className="page-subtitle">Pendientes, materiales y eventos académicos</p>
@@ -110,7 +109,7 @@ const SchoolHub = () => {
 
       {/* Filtros */}
       <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-        <div className="tab-list">
+        {!isKid && <div className="tab-list">
           {['Todos', ...children.map(c => c.name)].map(name => (
             <button
               key={name}
@@ -120,7 +119,7 @@ const SchoolHub = () => {
               {name}
             </button>
           ))}
-        </div>
+        </div>}
         <div className="tab-list">
           {['Todas', ...schoolCategories].map(cat => (
             <button
@@ -256,7 +255,7 @@ const SchoolHub = () => {
             <div key={task.id} className="card" style={{ borderLeft: `3px solid ${isUrgent ? 'var(--danger)' : 'transparent'}`, padding: '1.125rem 1.25rem' }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
                 <button
-                  onClick={() => toggleSchoolTask(task.id)}
+                  onClick={() => toggleSchoolTask(task.id, isKid)}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', marginTop: '0.125rem', flexShrink: 0 }}
                 >
                   <Circle size={22} color="var(--border)" strokeWidth={2} />
@@ -303,7 +302,7 @@ const SchoolHub = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {doneTasks.map(task => (
               <div key={task.id} style={{ padding: '0.875rem 1.125rem', background: 'var(--p-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', display: 'flex', alignItems: 'center', gap: '0.875rem', opacity: 0.6 }}>
-                <button onClick={() => toggleSchoolTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}>
+                <button onClick={() => toggleSchoolTask(task.id, isKid)} style={{ background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}>
                   <CheckCircle2 size={22} color="var(--success)" />
                 </button>
                 <div>
@@ -319,6 +318,7 @@ const SchoolHub = () => {
           </div>
         </div>
       )}
+      <GradesPanel child={isKid ? user?.name || '' : filterChild} canEdit={!isKid} />
     </div>
   );
 };

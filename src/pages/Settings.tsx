@@ -5,16 +5,46 @@ import { useData } from '../context/DataContext';
 import { useUser } from '../context/UserContext';
 import type { Member, Rule, Routine, Chore } from '../context/DataContext';
 
+const AVATARS = ['👦', '👧', '🧒', '👶', '👨', '👩', '🧔', '👱‍♀️', '👴', '👵', '🦸', '🧚', '🐶', '🐱', '🦄', '🐼'];
+
 const Settings = () => {
   const { updateTheme } = useUser();
   const { 
     members, routines, chores, rules,
     addRule, deleteRule, 
     addRoutine, deleteRoutine, 
-    addChore, deleteChore, updateMember 
+    addChore, deleteChore, updateMember, addMember,
   } = useData();
 
-  const [activeTab, setActiveTab] = useState<'members' | 'rules' | 'routines' | 'chores'>('members');
+  type Tab = 'members' | 'rules' | 'routines' | 'chores';
+  const [activeTab, setActiveTab] = useState<Tab>('members');
+
+  // Miembros
+  const [showMemberForm, setShowMemberForm] = useState(false);
+  const [editingMember, setEditingMember] = useState<Member | null>(null);
+  const [mName, setMName] = useState('');
+  const [mRole, setMRole] = useState<Member['role']>('child');
+  const [mAvatar, setMAvatar] = useState(AVATARS[0]);
+  const [mPin, setMPin] = useState('');
+
+  const openMember = (m: Member | null) => {
+    setEditingMember(m);
+    setMName(m?.name || ''); setMRole(m?.role || 'child');
+    setMAvatar(m?.avatar || AVATARS[0]); setMPin(m?.pin || '');
+    setShowMemberForm(true);
+  };
+
+  const handleMemberSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    const pin = mPin.trim() || undefined;
+    if (editingMember) {
+      updateMember(editingMember.id, { avatar: mAvatar, pin });
+    } else {
+      if (members.some(m => m.name.toLowerCase() === mName.trim().toLowerCase())) return;
+      addMember({ name: mName.trim(), role: mRole, avatar: mAvatar, pin });
+    }
+    setShowMemberForm(false);
+  };
 
   // States for Routines
   const [showRoutineForm, setShowRoutineForm] = useState(false);
@@ -81,7 +111,7 @@ const Settings = () => {
           { id: 'routines', label: 'Bloques Rutina', icon: Clock },
           { id: 'chores', label: 'Tareas Hogar', icon: List },
         ].map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} style={{ 
+          <button key={tab.id} onClick={() => setActiveTab(tab.id as Tab)} style={{ 
             display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.25rem', borderRadius: '12px', border: 'none', cursor: 'pointer', fontWeight: '800',
             background: activeTab === tab.id ? 'var(--p-primary)' : 'var(--p-surface)',
             color: activeTab === tab.id ? 'white' : 'var(--p-text)',
@@ -92,17 +122,65 @@ const Settings = () => {
 
       {/* Miembros */}
       {activeTab === 'members' && (
-        <div className="grid">
-          {members.map((m: Member) => (
-            <div key={m.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <div style={{ fontSize: '3rem' }}>{m.avatar}</div>
-              <div style={{ flex: 1 }}>
-                <h3 style={{ fontWeight: '900' }}>{m.name}</h3>
-                <span className="badge badge-blue">{m.role === 'parent' ? 'Papá/Mamá' : 'Hijo/a'}</span>
+        <div>
+          <div className="grid">
+            {members.map((m: Member) => (
+              <div key={m.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ fontSize: '3rem' }}>{m.avatar}</div>
+                <div style={{ flex: 1 }}>
+                  <h3 style={{ fontWeight: '900' }}>{m.name}</h3>
+                  <span className="badge badge-blue">{m.role === 'parent' ? 'Papá/Mamá' : 'Hijo/a'}</span>
+                  <span className="text-xs text-muted" style={{ marginLeft: '0.5rem' }}>{m.pin ? '🔒 Con PIN' : 'Sin PIN'}</span>
+                </div>
+                <button onClick={() => openMember(m)} aria-label={`Editar ${m.name}`} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><Edit2 size={18} color="var(--p-text-muted)"/></button>
               </div>
-              <button onClick={() => updateMember(m.id, {})} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><Edit2 size={18} color="var(--p-text-muted)"/></button>
+            ))}
+          </div>
+          <button className="btn-primary" style={{ marginTop: '1rem' }} onClick={() => openMember(null)}><UserPlus size={15} /> Agregar miembro</button>
+
+          {showMemberForm && (
+            <div className="modal-overlay">
+              <div className="modal-card" style={{ maxWidth: '420px' }}>
+                <button className="modal-close" onClick={() => setShowMemberForm(false)}><X size={16} /></button>
+                <h3 style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: '1.25rem' }}>{editingMember ? `Editar a ${editingMember.name}` : 'Nuevo miembro'}</h3>
+                <form onSubmit={handleMemberSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {!editingMember && (
+                    <div className="grid-2">
+                      <div className="form-group">
+                        <label className="form-label">Nombre *</label>
+                        <input required value={mName} onChange={e => setMName(e.target.value)} />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Rol</label>
+                        <select value={mRole} onChange={e => setMRole(e.target.value as Member['role'])}>
+                          <option value="child">Hijo/a</option>
+                          <option value="parent">Papá/Mamá</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                  <div className="form-group">
+                    <label className="form-label">Avatar</label>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.375rem' }}>
+                      {AVATARS.map(a => (
+                        <button type="button" key={a} onClick={() => setMAvatar(a)} style={{ fontSize: '1.5rem', width: '44px', height: '44px', borderRadius: '12px', cursor: 'pointer', border: mAvatar === a ? '2px solid var(--p-primary)' : '1px solid var(--border)', background: mAvatar === a ? 'var(--p-primary-50)' : 'transparent' }}>{a}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">PIN (4 a 6 números){(editingMember?.role ?? mRole) === 'child' ? ' · opcional' : ' *'}</label>
+                    <input
+                      inputMode="numeric" pattern="[0-9]{4,6}" maxLength={6}
+                      required={(editingMember?.role ?? mRole) === 'parent'}
+                      value={mPin} onChange={e => setMPin(e.target.value.replace(/[^0-9]/g, ''))}
+                      placeholder={(editingMember?.role ?? mRole) === 'child' ? 'Vacío = entra sin PIN' : '1234'}
+                    />
+                  </div>
+                  <button type="submit" className="btn-primary" style={{ justifyContent: 'center' }}><Save size={15} /> Guardar</button>
+                </form>
+              </div>
             </div>
-          ))}
+          )}
         </div>
       )}
 

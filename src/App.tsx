@@ -20,21 +20,19 @@ import { useData } from './context/DataContext';
 import { useNotifications } from './hooks/useNotifications';
 import {
   Bell, ChefHat, CheckSquare, TrendingUp, GraduationCap,
-  AlertTriangle, CheckCircle2, Clock, ArrowRight,
+  AlertTriangle, CheckCircle2, Clock, ArrowRight, CalendarDays,
 } from 'lucide-react';
+import { daysUntil } from './utils/dates';
 import './styles/App.css';
 
 const Dashboard = () => {
   const { viewMode } = useUser();
-  const { schoolTasks, points, weeklyMenu, foods, chores, members, prizeRequests } = useData();
+  const { schoolTasks, points, weeklyMenu, foods, chores, members, prizeRequests, familyEvents, isCloudEnabled } = useData();
   const { requestPermission } = useNotifications(schoolTasks);
 
   if (viewMode === 'child') return <KidZone />;
 
-  const getDaysLeft = (dateStr: string) => {
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    return Math.ceil((new Date(dateStr).getTime() - today.getTime()) / 86400000);
-  };
+  const getDaysLeft = (dateStr: string) => daysUntil(dateStr);
 
   const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
   const todayName = dayNames[new Date().getDay()];
@@ -51,6 +49,11 @@ const Dashboard = () => {
     .filter(t => t.daysLeft > 3)
     .sort((a, b) => a.daysLeft - b.daysLeft)
     .slice(0, 3);
+
+  const upcomingEvents = familyEvents
+    .filter(e => daysUntil(e.date) >= 0 && daysUntil(e.date) <= 14)
+    .sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')))
+    .slice(0, 4);
 
   const pendingChores = chores.filter(c => c.status === 'Pendiente');
   const pendingPrizes = prizeRequests.filter(r => r.status === 'pending');
@@ -69,7 +72,7 @@ const Dashboard = () => {
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
       {/* Header */}
-      <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+      <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '0.75rem' }}>
         <div>
           <h1 className="page-title">Centro de Comando</h1>
           <p className="page-subtitle">
@@ -91,12 +94,12 @@ const Dashboard = () => {
               <Bell size={12} /> Activar alertas
             </button>
           )}
-          <span className="badge badge-blue">Hogar Sincronizado</span>
+          <span className="badge badge-blue">{isCloudEnabled ? 'Sincronizado en la nube' : 'Guardado en este dispositivo'}</span>
         </div>
       </header>
 
       {/* Stat chips */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.875rem', marginBottom: '1.5rem' }}>
+      <div className="dash-stats">
         <Link to="/school" style={{ textDecoration: 'none' }}>
           <div style={{ padding: '1rem 1.25rem', background: urgentTasks.length > 0 ? '#fef2f2' : 'var(--p-surface)', border: `1px solid ${urgentTasks.length > 0 ? '#fecaca' : 'var(--border)'}`, borderRadius: 'var(--radius)', display: 'flex', alignItems: 'center', gap: '0.75rem', transition: 'all 0.15s' }}>
             <div style={{ width: '40px', height: '40px', borderRadius: 'var(--radius)', background: urgentTasks.length > 0 ? '#fee2e2' : 'var(--p-background)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -134,7 +137,7 @@ const Dashboard = () => {
         </Link>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+      <div className="dash-cols">
 
         {/* Preparación del día — columna izquierda */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -214,6 +217,32 @@ const Dashboard = () => {
 
         {/* Columna derecha */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+          {/* Próximos eventos familiares */}
+          <div className="card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.875rem' }}>
+              <h3 className="card-title"><CalendarDays size={16} color="var(--p-primary)" /> Próximos eventos</h3>
+              <Link to="/calendar" className="btn-ghost" style={{ padding: '0.25rem 0.625rem', fontSize: '0.75rem' }}>Calendario</Link>
+            </div>
+            {upcomingEvents.length === 0 ? (
+              <p style={{ fontSize: '0.85rem', color: 'var(--p-text-muted)', padding: '0.5rem 0' }}>Sin eventos en los próximos 14 días</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+                {upcomingEvents.map(ev => (
+                  <div key={ev.id} style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', padding: '0.5rem 0.75rem', background: 'var(--p-background)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+                    <span style={{ width: '4px', alignSelf: 'stretch', borderRadius: '999px', background: ev.color || 'var(--p-primary)' }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontWeight: '600', fontSize: '0.85rem' }} className="truncate">{ev.title}</p>
+                      <p style={{ fontSize: '0.7rem', color: 'var(--p-text-muted)' }}>{ev.members.join(', ')}{ev.time ? ` · ${ev.time}` : ''}</p>
+                    </div>
+                    <span style={{ fontSize: '0.7rem', fontWeight: '700', color: 'var(--p-text-muted)' }}>
+                      {daysUntil(ev.date) === 0 ? 'HOY' : daysUntil(ev.date) === 1 ? 'Mañana' : `${daysUntil(ev.date)}d`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Alertas escolares */}
           <div className="card" style={{ borderLeft: urgentTasks.length > 0 ? '3px solid var(--danger)' : '3px solid var(--border)' }}>

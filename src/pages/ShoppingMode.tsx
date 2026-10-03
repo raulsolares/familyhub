@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { CheckCircle2, Circle, ArrowLeft, MessageSquare, Package, Tag, DollarSign, Check } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useData } from '../context/DataContext';
@@ -23,11 +23,18 @@ const ShoppingMode = () => {
     extraItems, addExtraItem, updateExtraItem,
   } = useData();
 
-  const [items, setItems] = useState<ShoppingItem[]>([]);
+  // Lo marcado como comprado sobrevive recargas mientras se está en el súper
+  const [boughtKeys, setBoughtKeys] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('fh_shop_bought') || '[]'); } catch { return []; }
+  });
+  const saveBought = (next: string[]) => {
+    setBoughtKeys(next);
+    try { localStorage.setItem('fh_shop_bought', JSON.stringify(next)); } catch { /* sin almacenamiento */ }
+  };
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
   const [tempPrice, setTempPrice] = useState<string>('');
 
-  useEffect(() => {
+  const buildItems = (): ShoppingItem[] => {
     const agg = new Map<string, { name: string; qty: number; unit: string }>();
     weeklyMenu.forEach(slot => {
       slot.foodIds.forEach(fid => {
@@ -42,10 +49,10 @@ const ShoppingMode = () => {
       });
     });
 
-    const menuItems: ShoppingItem[] = Array.from(agg.values()).map((val, idx) => {
+    const menuItems: ShoppingItem[] = Array.from(agg.entries()).map(([key, val]) => {
       const prod = products.find((p: Product) => p.name.toLowerCase() === val.name.toLowerCase());
       return {
-        id: `menu_${idx}`,
+        id: `menu_${key}`,
         name: val.name,
         qty: val.qty,
         unit: val.unit,
@@ -75,18 +82,17 @@ const ShoppingMode = () => {
         };
       });
 
-    setItems([...menuItems, ...extraList]);
-  }, [weeklyMenu, foods, products, customShoppingItems, extraItems]);
+    return [...menuItems, ...extraList].map(i => ({ ...i, bought: boughtKeys.includes(i.id) }));
+  };
+  const items = buildItems();
 
   const toggleItem = (id: string) =>
-    setItems(prev => prev.map(item => item.id === id ? { ...item, bought: !item.bought } : item));
+    saveBought(boughtKeys.includes(id) ? boughtKeys.filter(k => k !== id) : [...boughtKeys, id]);
 
   const savePrice = (item: ShoppingItem) => {
     const price = parseFloat(tempPrice);
     if (isNaN(price) || price < 0) { setEditingPriceId(null); return; }
 
-    // Actualizar en items locales
-    setItems(prev => prev.map(i => i.id === item.id ? { ...i, price } : i));
 
     if (item.source === 'menu') {
       // Guardar/actualizar en catálogo de productos
