@@ -3,6 +3,9 @@ import { Search, Edit2, Trash2, UtensilsCrossed, X, Minus, Star, Clock, AlertCir
 import { useUser } from '../context/UserContext';
 import { useData } from '../context/DataContext';
 import type { Food, Ingredient } from '../context/DataContext';
+import { foodEmoji } from '../utils/food';
+
+const EMOJI_CHOICES = ['🍳','🥞','🥣','🍓','🥪','🌮','🍕','🍔','🍝','🍗','🥩','🐟','🍚','🍲','🥗','🥕','🫓','🌭','🍟','🍪','🍦','🍰','🥛','🧃'];
 
 const FoodManager = () => {
   const { role } = useUser();
@@ -24,6 +27,7 @@ const FoodManager = () => {
   const [isFavorite, setIsFavorite] = useState(false);
   const [maxPerWeek, setMaxPerWeek] = useState<number | ''>('');
   const [group, setGroup] = useState('');
+  const [emoji, setEmoji] = useState('');
   const [calories, setCalories] = useState<number | ''>('');
   const [prepTime, setPrepTime] = useState<number | ''>('');
 
@@ -47,6 +51,7 @@ const FoodManager = () => {
       isFavorite,
       maxPerWeek: maxPerWeek ? Number(maxPerWeek) : undefined,
       group: group.trim() || undefined,
+      emoji: emoji.trim() || undefined,
       calories: calories ? Number(calories) : undefined,
       prepTime: prepTime ? Number(prepTime) : undefined,
     };
@@ -65,6 +70,7 @@ const FoodManager = () => {
     setIsFavorite(false);
     setMaxPerWeek('');
     setGroup('');
+    setEmoji('');
     setCalories('');
     setPrepTime('');
     setEditingFood(null);
@@ -79,6 +85,7 @@ const FoodManager = () => {
     setIsFavorite(food.isFavorite || false);
     setMaxPerWeek(food.maxPerWeek || '');
     setGroup(food.group || '');
+    setEmoji(food.emoji || '');
     setCalories(food.calories || '');
     setPrepTime(food.prepTime || '');
     setShowForm(true);
@@ -203,6 +210,17 @@ const FoodManager = () => {
                 <div>
                   <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', marginBottom: '0.4rem' }}>Límite por niño /semana</label>
                   <input value={maxPerWeek} onChange={(e) => setMaxPerWeek(e.target.value === '' ? '' : Number(e.target.value))} type="number" placeholder="Veces" style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border)' }} />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Emoji (lo ven los niños)</label>
+                <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span style={{ fontSize: '1.75rem', width: '2.5rem', textAlign: 'center' }}>{foodEmoji({ name, emoji })}</span>
+                  {EMOJI_CHOICES.map(e => (
+                    <button type="button" key={e} onClick={() => setEmoji(e)} aria-label={`Usar ${e}`}
+                      style={{ fontSize: '1.2rem', width: '34px', height: '34px', borderRadius: '8px', cursor: 'pointer', border: emoji === e ? '2px solid var(--p-primary)' : '1px solid var(--border)', background: 'var(--p-surface)' }}>{e}</button>
+                  ))}
                 </div>
               </div>
 
@@ -339,7 +357,7 @@ const FoodManager = () => {
                         </span>
                       ))}
                     </div>
-                    <h3 style={{ fontWeight: '800', fontSize: '1.25rem' }}>{food.name}</h3>
+                    <h3 style={{ fontWeight: '700', fontSize: '1.1rem' }}><span style={{ marginRight: '0.375rem' }}>{foodEmoji(food)}</span>{food.name}</h3>
                     {(food.calories || food.prepTime || food.maxPerWeek || food.group) && (
                       <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.3rem', fontSize: '0.75rem', color: 'var(--p-text-muted)', fontWeight: '600' }}>
                         {food.prepTime && <span><Clock size={10} /> {food.prepTime} min</span>}

@@ -26,13 +26,32 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=
 VITE_FIREBASE_APP_ID=
 ```
 
+Para notificaciones push (opcional, requiere Firebase) agregar también en Vercel:
+
+```
+VITE_VAPID_PUBLIC_KEY=   # misma llave pública, expuesta al navegador
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=mailto:tu@correo.com
+CRON_SECRET=             # opcional; Vercel lo manda a las crons
+```
+
+Las llaves se generan con `npx web-push generate-vapid-keys`.
+
 Sin estas variables, la app guarda todo en `localStorage` (clave `fh_state_v2`) de ese dispositivo. Con Firebase, además sincroniza en tiempo real entre dispositivos. En el primer arranque se cargan datos de ejemplo (`src/data/seed.ts`).
 
 ## Arquitectura
 
 **Stack:** React 19 + TypeScript + Vite + React Router v7 + Firebase Firestore + Lucide React.
 
-**Deploy:** Vercel. `vercel.json` redirige todo a `index.html` para SPA routing.
+**Deploy:** Vercel. `vercel.json` redirige todo excepto `/api/*` a `index.html` (SPA routing) y define dos crons diarias.
+
+### Notificaciones push
+
+- Cliente: `src/utils/push.ts` (suscribir dispositivo, `notify()` que hace POST a `/api/push/notify`), `src/hooks/usePush.ts`, panel en Configuración → Notificaciones. Las suscripciones se guardan en el estado (`pushSubscriptions`, por miembro) y se sincronizan a Firestore.
+- Servidor (funciones de Vercel en `api/`): `api/push/notify.ts` envía con `web-push` leyendo el documento de Firestore; `api/cron/digest.ts?slot=morning|evening` manda el resumen de 7:00 y los recordatorios de 19:30 (hora de México). Helpers en `api/_lib/family.ts`. `api/` se revisa con su propio `api/tsconfig.json`.
+- `public/sw.js` muestra la notificación y abre la URL al tocarla.
+- Limitación: `/api/push/notify` no tiene autenticación (igual que Firestore).
 
 ### Flujo de Estado Global
 
@@ -51,6 +70,8 @@ Todo el estado de la aplicación vive en **dos contextos**:
 - **Padres** (Raúl, Tania): tema `light` o `dark`, acceso completo.
 - **Hijos** (Alan, Aria): tema `fun` (rosa/kids), redirigidos automáticamente a `KidZone` desde el Dashboard.
 
+Estilos: `src/styles/App.css` (tokens y base) + `src/styles/design.css` (sistema de diseño actual: papás sobrio con Inter, niños con Nunito y colores vivos; sheets, dashboard, menú, navegación móvil).
+
 El tema se aplica como clase CSS en el wrapper raíz (`theme-light`, `theme-dark`, `theme-fun`) definido en `src/styles/App.css` usando custom properties CSS (`--p-primary`, `--p-background`, etc.).
 
 ### Routing
@@ -61,7 +82,7 @@ El tema se aplica como clase CSS en el wrapper raíz (`theme-light`, `theme-dark
 
 | Ruta | Archivo | Descripción |
 |---|---|---|
-| `/` | `App.tsx` (Dashboard) | Centro de comando con widgets de urgencias, puntos, menú del día |
+| `/` | `Dashboard.tsx` | Centro de comando con widgets de urgencias, puntos, menú del día |
 | `/menu` | `WeeklyMenu.tsx` | Planificación de menú semanal por miembro y tiempo de comida |
 | `/food` | `FoodManager.tsx` | Catálogo de alimentos con ingredientes, categorías y favoritos |
 | `/shopping` | `ShoppingList.tsx` | Lista de compras con cálculo automático desde el menú |
@@ -80,5 +101,4 @@ Todas las interfaces del dominio están en `DataContext.tsx`: `Food`, `WeeklyMen
 ## Pendientes Conocidos
 
 - Audio: sistema de assets de audio reales (actualmente mocks).
-- Notificaciones push via Service Workers.
 - Reglas de seguridad de Firestore (actualmente abiertas).

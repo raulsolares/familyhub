@@ -50,3 +50,25 @@ export const remainingFor = (
   }
   return Math.max(0, remaining);
 };
+
+export const MEALS = ['Desayuno', 'Lunch', 'Comida', 'Cena'];
+export const MEAL_EMOJI: Record<string, string> = {
+  Desayuno: '🌅', Snack: '🍎', Lunch: '🎒', Comida: '🍽️', Merienda: '🧃', Cena: '🌙',
+};
+
+const KEYWORD_EMOJI: [RegExp, string][] = [
+  [/pizza/i, '🍕'], [/hamburg/i, '🍔'], [/hot ?dog/i, '🌭'], [/taco/i, '🌮'], [/burrito/i, '🌯'],
+  [/quesadilla|tortilla/i, '🫓'], [/sándwich|sandwich|torta/i, '🥪'], [/pasta|espagueti|spaghetti|fideo/i, '🍝'],
+  [/sopa|caldo|crema/i, '🍲'], [/arroz/i, '🍚'], [/pollo/i, '🍗'], [/carne|bistec|res/i, '🥩'], [/pescado|atún|salmón/i, '🐟'],
+  [/huevo/i, '🍳'], [/hot ?cake|panqué|waffle/i, '🥞'], [/cereal|avena/i, '🥣'], [/pan|bolillo|mollete/i, '🥖'],
+  [/fruta|manzana|plátano|fresa/i, '🍓'], [/verdura|ensalada|pepino|zanahoria|brócoli/i, '🥗'], [/yogurt|yogur/i, '🥛'],
+  [/leche/i, '🥛'], [/galleta/i, '🍪'], [/helado|nieve/i, '🍦'], [/pastel|dulce|chocolate|postre/i, '🍰'],
+  [/papa|frita/i, '🍟'], [/queso/i, '🧀'], [/sushi/i, '🍣'], [/jugo|agua/i, '🧃'],
+];
+
+/** Emoji del platillo: el que pusieron los papás, o uno deducido del nombre */
+export const foodEmoji = (food: Pick<Food, 'name' | 'emoji'>) => {
+  if (food.emoji) return food.emoji;
+  const hit = KEYWORD_EMOJI.find(([re]) => re.test(food.name));
+  return hit ? hit[1] : '🍽️';
+};

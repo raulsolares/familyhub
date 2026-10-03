@@ -3,6 +3,7 @@ import { Award, TrendingUp, Trophy, History, Plus, Trash2, X, ShoppingBag, Star,
 import { useUser } from '../context/UserContext';
 import { useData } from '../context/DataContext';
 import type { Rule, PointLog, Prize } from '../context/DataContext';
+import { notify } from '../utils/push';
 
 type Tab = 'scoreboard' | 'store' | 'history';
 
@@ -11,7 +12,7 @@ const Rewards = () => {
   const {
     points, pointLogs, rules, addPointLog, deletePointLog, members,
     prizes, prizeRequests, addPrize, updatePrize, deletePrize,
-    addPrizeRequest, updatePrizeRequest, deletePrizeRequest,
+    addPrizeRequest, resolvePrizeRequest, deletePrizeRequest,
   } = useData();
 
   const isKid = viewMode === 'child';
@@ -43,6 +44,14 @@ const Rewards = () => {
         description: `${rule.description}${applyReason ? ` — ${applyReason}` : ''}`,
         points: rule.points,
       });
+      if (members.some(m => m.name === applyMember && m.role === 'child')) {
+        notify({
+          to: [applyMember],
+          title: rule.points >= 0 ? `⭐ +${rule.points} puntos` : `${rule.points} puntos`,
+          body: rule.description,
+          url: '/rewards',
+        });
+      }
       setShowRuleForm(false);
       setApplyReason('');
     }
@@ -74,6 +83,7 @@ const Rewards = () => {
     const alreadyPending = prizeRequests.some(r => r.prizeId === prize.id && r.member === user.name && r.status === 'pending');
     if (alreadyPending) return;
     addPrizeRequest({ member: user.name, prizeId: prize.id });
+    notify({ to: 'parents', title: `🎁 ${user.name} quiere canjear un premio`, body: `${prize.name} · ${prize.points} pts`, url: '/' });
   };
 
   const scoreboard = members
@@ -229,11 +239,9 @@ const Rewards = () => {
                           className="btn-primary"
                           style={{ padding: '0.375rem 0.875rem', fontSize: '0.8rem' }}
                           onClick={() => {
-                            updatePrizeRequest(req.id, { status: 'approved' });
+                            resolvePrizeRequest(req.id, true);
                             const prize = prizes.find(p => p.id === req.prizeId);
-                            if (prize) {
-                              addPointLog({ member: req.member, description: `Canje: ${prize.name}`, points: -prize.points });
-                            }
+                            notify({ to: [req.member], title: '🎁 ¡Premio aprobado!', body: `Ya puedes disfrutar: ${prize?.name || 'tu premio'}`, url: '/rewards' });
                           }}
                         >
                           <CheckCircle size={14} /> Aprobar
@@ -241,7 +249,10 @@ const Rewards = () => {
                         <button
                           className="btn-icon"
                           style={{ color: 'var(--danger)' }}
-                          onClick={() => updatePrizeRequest(req.id, { status: 'rejected' })}
+                          onClick={() => {
+                            resolvePrizeRequest(req.id, false);
+                            notify({ to: [req.member], title: 'Canje no aprobado', body: 'Habla con papá o mamá sobre tu premio.', url: '/rewards' });
+                          }}
                         >
                           <XCircle size={16} />
                         </button>

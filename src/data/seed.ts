@@ -18,22 +18,22 @@ export const SEED_FOOD_GROUP_LIMITS: Record<string, number> = {
 const ing = (name: string, amount: number, unit: string) => ({ name, amount, unit });
 
 export const SEED_FOODS: Food[] = [
-  { id: 'f1', name: 'Hot cakes', categories: ['Desayuno'], group: 'Harinas', maxPerWeek: 2, ingredients: [ing('Harina para hot cakes', 100, 'gr'), ing('Leche', 150, 'ml'), ing('Huevo', 1, 'pzas')] },
-  { id: 'f2', name: 'Huevo revuelto', categories: ['Desayuno', 'Cena'], group: 'Proteína', ingredients: [ing('Huevo', 2, 'pzas')] },
-  { id: 'f3', name: 'Cereal con leche', categories: ['Desayuno', 'Cena'], group: 'Dulces', maxPerWeek: 3, ingredients: [ing('Cereal', 40, 'gr'), ing('Leche', 200, 'ml')] },
-  { id: 'f4', name: 'Fruta con yogurt', categories: ['Desayuno', 'Lunch'], group: 'Frutas y verduras', ingredients: [ing('Yogurt', 1, 'pzas'), ing('Plátano', 1, 'pzas')] },
-  { id: 'f5', name: 'Molletes', categories: ['Desayuno', 'Cena'], group: 'Harinas', ingredients: [ing('Bolillo', 1, 'pzas'), ing('Frijoles', 80, 'gr'), ing('Queso', 40, 'gr')] },
-  { id: 'f6', name: 'Sándwich de jamón', categories: ['Lunch', 'Cena'], group: 'Harinas', ingredients: [ing('Pan de caja', 2, 'pzas'), ing('Jamón', 2, 'pzas'), ing('Queso', 1, 'pzas')] },
-  { id: 'f7', name: 'Galletas', categories: ['Lunch'], group: 'Dulces', maxPerWeek: 2, ingredients: [ing('Galletas', 1, 'paq')] },
-  { id: 'f8', name: 'Pepino y zanahoria', categories: ['Lunch'], group: 'Frutas y verduras', ingredients: [ing('Pepino', 1, 'pzas'), ing('Zanahoria', 1, 'pzas')] },
-  { id: 'f9', name: 'Pollo con arroz', categories: ['Comida'], group: 'Proteína', ingredients: [ing('Pechuga de pollo', 150, 'gr'), ing('Arroz', 80, 'gr')] },
-  { id: 'f10', name: 'Pasta', categories: ['Comida'], group: 'Harinas', maxPerWeek: 2, ingredients: [ing('Pasta', 100, 'gr'), ing('Puré de tomate', 100, 'ml')] },
-  { id: 'f11', name: 'Tacos de bistec', categories: ['Comida', 'Cena'], group: 'Proteína', ingredients: [ing('Bistec', 150, 'gr'), ing('Tortillas', 4, 'pzas')] },
-  { id: 'f12', name: 'Sopa de verduras', categories: ['Comida'], group: 'Frutas y verduras', ingredients: [ing('Calabacita', 1, 'pzas'), ing('Zanahoria', 1, 'pzas'), ing('Papa', 1, 'pzas')] },
-  { id: 'f13', name: 'Pizza', categories: ['Comida', 'Cena'], group: 'Comida rápida', maxPerWeek: 1, ingredients: [ing('Pizza congelada', 1, 'pzas')] },
-  { id: 'f14', name: 'Hamburguesa', categories: ['Comida', 'Cena'], group: 'Comida rápida', maxPerWeek: 1, ingredients: [ing('Carne para hamburguesa', 1, 'pzas'), ing('Pan de hamburguesa', 1, 'pzas')] },
-  { id: 'f15', name: 'Quesadillas', categories: ['Cena'], group: 'Harinas', ingredients: [ing('Tortillas', 3, 'pzas'), ing('Queso', 60, 'gr')] },
-  { id: 'f16', name: 'Helado', categories: ['Comida', 'Cena'], group: 'Dulces', maxPerWeek: 1, ingredients: [ing('Helado', 1, 'pzas')] },
+  { id: 'f1', name: 'Hot cakes', emoji: '🥞', categories: ['Desayuno'], group: 'Harinas', maxPerWeek: 2, ingredients: [ing('Harina para hot cakes', 100, 'gr'), ing('Leche', 150, 'ml'), ing('Huevo', 1, 'pzas')] },
+  { id: 'f2', name: 'Huevo revuelto', emoji: '🍳', categories: ['Desayuno', 'Cena'], group: 'Proteína', ingredients: [ing('Huevo', 2, 'pzas')] },
+  { id: 'f3', name: 'Cereal con leche', emoji: '🥣', categories: ['Desayuno', 'Cena'], group: 'Dulces', maxPerWeek: 3, ingredients: [ing('Cereal', 40, 'gr'), ing('Leche', 200, 'ml')] },
+  { id: 'f4', name: 'Fruta con yogurt', emoji: '🍓', categories: ['Desayuno', 'Lunch'], group: 'Frutas y verduras', ingredients: [ing('Yogurt', 1, 'pzas'), ing('Plátano', 1, 'pzas')] },
+  { id: 'f5', name: 'Molletes', emoji: '🥖', categories: ['Desayuno', 'Cena'], group: 'Harinas', ingredients: [ing('Bolillo', 1, 'pzas'), ing('Frijoles', 80, 'gr'), ing('Queso', 40, 'gr')] },
+  { id: 'f6', name: 'Sándwich de jamón', emoji: '🥪', categories: ['Lunch', 'Cena'], group: 'Harinas', ingredients: [ing('Pan de caja', 2, 'pzas'), ing('Jamón', 2, 'pzas'), ing('Queso', 1, 'pzas')] },
+  { id: 'f7', name: 'Galletas', emoji: '🍪', categories: ['Lunch'], group: 'Dulces', maxPerWeek: 2, ingredients: [ing('Galletas', 1, 'paq')] },
+  { id: 'f8', name: 'Pepino y zanahoria', emoji: '🥕', categories: ['Lunch'], group: 'Frutas y verduras', ingredients: [ing('Pepino', 1, 'pzas'), ing('Zanahoria', 1, 'pzas')] },
+  { id: 'f9', name: 'Pollo con arroz', emoji: '🍗', categories: ['Comida'], group: 'Proteína', ingredients: [ing('Pechuga de pollo', 150, 'gr'), ing('Arroz', 80, 'gr')] },
+  { id: 'f10', name: 'Pasta', emoji: '🍝', categories: ['Comida'], group: 'Harinas', maxPerWeek: 2, ingredients: [ing('Pasta', 100, 'gr'), ing('Puré de tomate', 100, 'ml')] },
+  { id: 'f11', name: 'Tacos de bistec', emoji: '🌮', categories: ['Comida', 'Cena'], group: 'Proteína', ingredients: [ing('Bistec', 150, 'gr'), ing('Tortillas', 4, 'pzas')] },
+  { id: 'f12', name: 'Sopa de verduras', emoji: '🍲', categories: ['Comida'], group: 'Frutas y verduras', ingredients: [ing('Calabacita', 1, 'pzas'), ing('Zanahoria', 1, 'pzas'), ing('Papa', 1, 'pzas')] },
+  { id: 'f13', name: 'Pizza', emoji: '🍕', categories: ['Comida', 'Cena'], group: 'Comida rápida', maxPerWeek: 1, ingredients: [ing('Pizza congelada', 1, 'pzas')] },
+  { id: 'f14', name: 'Hamburguesa', emoji: '🍔', categories: ['Comida', 'Cena'], group: 'Comida rápida', maxPerWeek: 1, ingredients: [ing('Carne para hamburguesa', 1, 'pzas'), ing('Pan de hamburguesa', 1, 'pzas')] },
+  { id: 'f15', name: 'Quesadillas', emoji: '🫓', categories: ['Cena'], group: 'Harinas', ingredients: [ing('Tortillas', 3, 'pzas'), ing('Queso', 60, 'gr')] },
+  { id: 'f16', name: 'Helado', emoji: '🍦', categories: ['Comida', 'Cena'], group: 'Dulces', maxPerWeek: 1, ingredients: [ing('Helado', 1, 'pzas')] },
 ];
 
 export const SEED_PRODUCTS: Product[] = [

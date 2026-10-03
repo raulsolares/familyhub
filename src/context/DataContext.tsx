@@ -32,6 +32,8 @@ export interface Food {
   maxPerWeek?: number;
   /** Grupo (Dulces, Comida rápida...) con tope semanal en foodGroupLimits */
   group?: string;
+  /** Emoji para mostrar el platillo (sobre todo a los niños) */
+  emoji?: string;
   isFavorite?: boolean;
   calories?: number;
   prepTime?: number;
@@ -176,6 +178,15 @@ export interface CustomShoppingItem {
   createdAt: string;
 }
 
+export interface PushSubscriptionRecord {
+  id: string;
+  member: string;
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+  device: string;
+  createdAt: string;
+}
+
 export interface ExtraItem {
   id: string;
   name: string;
@@ -205,6 +216,7 @@ interface AppState {
   customShoppingItems: CustomShoppingItem[];
   extraItems: ExtraItem[];
   foodGroupLimits: Record<string, number>;
+  pushSubscriptions: PushSubscriptionRecord[];
 }
 
 // ── Context type ─────────────────────────────────────────────────────────────
@@ -219,6 +231,9 @@ interface DataContextType extends Omit<AppState, 'chores'> {
   deleteFood: (id: string) => void;
   clearFoods: () => void;
   setFoodGroupLimit: (group: string, limit: number | null) => void;
+
+  savePushSubscription: (sub: Omit<PushSubscriptionRecord, 'id' | 'createdAt'>) => void;
+  removePushSubscription: (endpoint: string) => void;
 
   addIngredientItem: (item: Omit<IngredientItem, 'id'>) => void;
   deleteIngredientItem: (id: string) => void;
@@ -276,6 +291,8 @@ interface DataContextType extends Omit<AppState, 'chores'> {
   addPrizeRequest: (req: Omit<PrizeRequest, 'id' | 'date' | 'status'>) => void;
   updatePrizeRequest: (id: string, req: Partial<PrizeRequest>) => void;
   deletePrizeRequest: (id: string) => void;
+  /** Aprueba (descuenta puntos) o rechaza un canje */
+  resolvePrizeRequest: (id: string, approve: boolean) => void;
 
   addCustomShoppingItem: (item: Omit<CustomShoppingItem, 'id' | 'checked' | 'createdAt'>) => void;
   updateCustomShoppingItem: (id: string, item: Partial<CustomShoppingItem>) => void;
@@ -334,6 +351,7 @@ const seedState = (): AppState => ({
   customShoppingItems: [],
   extraItems: [],
   foodGroupLimits: SEED_FOOD_GROUP_LIMITS,
+  pushSubscriptions: [],
 });
 
 /** Acepta datos guardados (local o nube) de versiones anteriores y los normaliza */
@@ -550,6 +568,16 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       clearFoods: () => patch(() => ({ foods: [], ingredientItems: [] })),
       setFoodGroupLimit,
 
+      savePushSubscription: (sub) => patch(s => ({
+        pushSubscriptions: [
+          ...s.pushSubscriptions.filter(p => p.endpoint !== sub.endpoint),
+          { ...sub, id: uid(), createdAt: new Date().toISOString() },
+        ],
+      })),
+      removePushSubscription: (endpoint) => patch(s => ({
+        pushSubscriptions: s.pushSubscriptions.filter(p => p.endpoint !== endpoint),
+      })),
+
       addIngredientItem: (i) => addTo('ingredientItems', i),
       deleteIngredientItem: (id) => removeFrom('ingredientItems', id),
 
@@ -605,6 +633,17 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       addPrizeRequest: (r) => addTo('prizeRequests', { ...r, date: new Date().toISOString(), status: 'pending' }),
       updatePrizeRequest: (id, r) => updateIn('prizeRequests', id, r),
       deletePrizeRequest: (id) => removeFrom('prizeRequests', id),
+      resolvePrizeRequest: (id, approve) => patch(s => {
+        const req = s.prizeRequests.find(r => r.id === id);
+        if (!req || req.status !== 'pending') return {};
+        const prize = s.prizes.find(p => p.id === req.prizeId);
+        return {
+          prizeRequests: s.prizeRequests.map(r => (r.id === id ? { ...r, status: approve ? 'approved' : 'rejected' } : r)),
+          pointLogs: approve && prize
+            ? [...s.pointLogs, newLog({ member: req.member, description: `Canje: ${prize.name}`, points: -prize.points, sourceKey: `prize_${id}` })]
+            : s.pointLogs,
+        };
+      }),
 
       addCustomShoppingItem: (i) => addTo('customShoppingItems', { ...i, checked: false, createdAt: new Date().toISOString() }),
       updateCustomShoppingItem: (id, i) => updateIn('customShoppingItems', id, i),

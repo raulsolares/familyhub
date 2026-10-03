@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { UserPlus, Shield, Clock, Trash2, Edit2, List, X, Save } from 'lucide-react';
+import { UserPlus, Shield, Clock, Trash2, Edit2, List, X, Save, Bell, Sun, Moon } from 'lucide-react';
+import NotificationSettings from '../components/NotificationSettings';
 import { useData } from '../context/DataContext';
 import { useUser } from '../context/UserContext';
 import type { Member, Rule, Routine, Chore } from '../context/DataContext';
@@ -8,7 +9,8 @@ import type { Member, Rule, Routine, Chore } from '../context/DataContext';
 const AVATARS = ['👦', '👧', '🧒', '👶', '👨', '👩', '🧔', '👱‍♀️', '👴', '👵', '🦸', '🧚', '🐶', '🐱', '🦄', '🐼'];
 
 const Settings = () => {
-  const { updateTheme } = useUser();
+  const { updateTheme, user } = useUser();
+  const theme = user?.theme;
   const { 
     members, routines, chores, rules,
     addRule, deleteRule, 
@@ -16,7 +18,7 @@ const Settings = () => {
     addChore, deleteChore, updateMember, addMember,
   } = useData();
 
-  type Tab = 'members' | 'rules' | 'routines' | 'chores';
+  type Tab = 'members' | 'rules' | 'routines' | 'chores' | 'notifications';
   const [activeTab, setActiveTab] = useState<Tab>('members');
 
   // Miembros
@@ -90,35 +92,32 @@ const Settings = () => {
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-      <header className="page-header">
-        <h1 className="page-title">Configuración Maestro</h1>
-        <p className="page-subtitle">Administra cada detalle de la logística familiar</p>
+      <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '1rem', flexWrap: 'wrap' }}>
+        <div>
+          <h1 className="page-title">Configuración</h1>
+          <p className="page-subtitle">Familia, retos, rutinas, tareas y notificaciones</p>
+        </div>
+        <div className="seg" role="group" aria-label="Tema">
+          <button className={theme !== 'dark' ? 'on' : ''} onClick={() => updateTheme('light')}><Sun size={13} style={{ verticalAlign: '-2px' }} /> Claro</button>
+          <button className={theme === 'dark' ? 'on' : ''} onClick={() => updateTheme('dark')}><Moon size={13} style={{ verticalAlign: '-2px' }} /> Oscuro</button>
+        </div>
       </header>
 
-      <div className="card" style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
-        <span style={{ fontWeight: '700' }}>Tema Visual</span>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button onClick={() => updateTheme('light')} className="badge badge-blue" style={{ cursor: 'pointer', border: 'none' }}>Claro</button>
-          <button onClick={() => updateTheme('dark')} className="badge" style={{ cursor: 'pointer', background: '#1e293b', color: 'white', border: 'none' }}>Oscuro</button>
-          <button onClick={() => updateTheme('fun')} className="badge badge-pink" style={{ cursor: 'pointer', border: 'none' }}>Divertido</button>
-        </div>
-      </div>
-
-      <nav style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
+      <div className="member-tabs" role="tablist" style={{ marginBottom: '1.5rem', overflowX: 'auto' }}>
         {[
           { id: 'members', label: 'Familia', icon: UserPlus },
-          { id: 'rules', label: 'Retos/Logros', icon: Shield },
-          { id: 'routines', label: 'Bloques Rutina', icon: Clock },
-          { id: 'chores', label: 'Tareas Hogar', icon: List },
+          { id: 'rules', label: 'Retos y logros', icon: Shield },
+          { id: 'routines', label: 'Rutinas', icon: Clock },
+          { id: 'chores', label: 'Tareas del hogar', icon: List },
+          { id: 'notifications', label: 'Notificaciones', icon: Bell },
         ].map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id as Tab)} style={{ 
-            display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.25rem', borderRadius: '12px', border: 'none', cursor: 'pointer', fontWeight: '800',
-            background: activeTab === tab.id ? 'var(--p-primary)' : 'var(--p-surface)',
-            color: activeTab === tab.id ? 'white' : 'var(--p-text)',
-            boxShadow: 'var(--shadow-premium)', whiteSpace: 'nowrap'
-          }}><tab.icon size={18}/> {tab.label}</button>
+          <button key={tab.id} role="tab" aria-selected={activeTab === tab.id} className={`member-tab${activeTab === tab.id ? ' on' : ''}`} onClick={() => setActiveTab(tab.id as Tab)}>
+            <tab.icon size={15} style={{ verticalAlign: '-3px' }} /> {tab.label}
+          </button>
         ))}
-      </nav>
+      </div>
+
+      {activeTab === 'notifications' && <NotificationSettings />}
 
       {/* Miembros */}
       {activeTab === 'members' && (
