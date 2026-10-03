@@ -2,28 +2,33 @@ import { useData } from '../context/DataContext';
 import type { MealChangeRequest } from '../context/DataContext';
 import { foodEmoji } from '../utils/food';
 import { notify } from '../utils/push';
+import { weekStartKey } from '../utils/dates';
 
 /** Solicitudes de cambio de comida: texto legible y aprobar/rechazar avisando al niño */
 export const useMealChanges = () => {
-  const { mealChangeRequests, weeklyMenu, foods, resolveMealChange } = useData();
+  const { mealChangeRequests, weeklyMenu, menuOf, foods, resolveMealChange } = useData();
+  const thisWeek = weekStartKey();
 
-  const dish = (member: string, day: string, meal: string) => {
-    const slot = weeklyMenu.find(w => w.member === member && w.day === day && w.meal === meal && w.foodIds.length);
+  const dish = (week: string, member: string, day: string, meal: string) => {
+    const menu = week === thisWeek ? weeklyMenu : menuOf(week);
+    const slot = menu.find(w => w.member === member && w.day === day && w.meal === meal && w.foodIds.length);
     if (!slot) return 'nada';
     return slot.foodIds.map(fid => foods.find(f => f.id === fid)).filter(Boolean).map(f => `${foodEmoji(f!)} ${f!.name}`).join(', ');
   };
 
   const describe = (r: MealChangeRequest) => {
+    const week = r.week || thisWeek;
+    const when = week === thisWeek ? '' : ' (próxima semana)';
     if (r.kind === 'swap' && r.swapDay) {
       return {
-        title: `Cambiar ${r.meal.toLowerCase()} del ${r.day.toLowerCase()} por la del ${r.swapDay.toLowerCase()}`,
-        detail: `${r.day}: ${dish(r.member, r.day, r.meal)} ⇄ ${r.swapDay}: ${dish(r.member, r.swapDay, r.meal)}`,
+        title: `Cambiar ${r.meal.toLowerCase()} del ${r.day.toLowerCase()} por la del ${r.swapDay.toLowerCase()}${when}`,
+        detail: `${r.day}: ${dish(week, r.member, r.day, r.meal)} ⇄ ${r.swapDay}: ${dish(week, r.member, r.swapDay, r.meal)}`,
       };
     }
     const next = (r.foodIds || []).map(fid => foods.find(f => f.id === fid)).filter(Boolean).map(f => `${foodEmoji(f!)} ${f!.name}`).join(', ');
     return {
-      title: `Cambiar ${r.meal.toLowerCase()} del ${r.day.toLowerCase()}`,
-      detail: `${dish(r.member, r.day, r.meal)} → ${next || 'nada'}`,
+      title: `Cambiar ${r.meal.toLowerCase()} del ${r.day.toLowerCase()}${when}`,
+      detail: `${dish(week, r.member, r.day, r.meal)} → ${next || 'nada'}`,
     };
   };
 

@@ -9,6 +9,8 @@ interface Props {
   member: string;
   day: string;
   meal: string;
+  /** Lunes de la semana (por omisión, la actual) */
+  week?: string;
   onClose: () => void;
   onSaved?: () => void;
   /** En lugar de guardar directo (p. ej. pedir permiso a papás) */
@@ -22,8 +24,9 @@ interface Props {
  * - Niños: mosaico grande con emojis; los topes semanales bloquean.
  * - Papás: lista compacta con búsqueda; los topes solo avisan y se puede aplicar a varios miembros.
  */
-const FoodPicker = ({ mode, member, day, meal, onClose, onSaved, onSubmit, submitLabel, title }: Props) => {
-  const { foods, weeklyMenu, members, foodGroupLimits, assignMeal } = useData();
+const FoodPicker = ({ mode, member, day, meal, week, onClose, onSaved, onSubmit, submitLabel, title }: Props) => {
+  const { foods, weeklyMenu: currentMenu, menuOf, members, foodGroupLimits, assignMeal } = useData();
+  const weeklyMenu = week ? menuOf(week) : currentMenu;
   const isKid = mode === 'kid';
 
   const slot = weeklyMenu.find(w => w.day === day && w.meal === meal && w.member === member);
@@ -74,7 +77,7 @@ const FoodPicker = ({ mode, member, day, meal, onClose, onSaved, onSubmit, submi
   const save = () => {
     const ids = Object.keys(quantities);
     if (onSubmit) { onSubmit(ids, quantities); onClose(); return; }
-    [member, ...alsoFor].forEach(m => assignMeal(day, meal, ids, m, quantities));
+    [member, ...alsoFor].forEach(m => assignMeal(day, meal, ids, m, quantities, week));
     if (isKid) sounds.save();
     onSaved?.();
     onClose();
@@ -240,7 +243,7 @@ const FoodPicker = ({ mode, member, day, meal, onClose, onSaved, onSubmit, submi
             </div>
           )}
           <div style={{ display: 'flex', gap: '0.5rem' }}>
-            {slot && <button className="btn-secondary" onClick={() => { setQuantities({}); [member, ...alsoFor].forEach(m => assignMeal(day, meal, [], m)); onClose(); }}>Vaciar</button>}
+            {slot && <button className="btn-secondary" onClick={() => { setQuantities({}); [member, ...alsoFor].forEach(m => assignMeal(day, meal, [], m, {}, week)); onClose(); }}>Vaciar</button>}
             <button className="btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={save}>
               Guardar{selectedIds.length ? ` (${selectedIds.length})` : ''}
             </button>

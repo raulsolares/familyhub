@@ -4,19 +4,25 @@ import { Plus, RefreshCw, Copy, ShoppingCart, BookOpen, Check, Lock, Unlock, X }
 import { useData } from '../context/DataContext';
 import FoodPicker from '../components/FoodPicker';
 import { MEALS, MEAL_EMOJI, foodEmoji, getFoodUsage } from '../utils/food';
-import { WEEK_DAYS, todayName } from '../utils/dates';
+import { WEEK_DAYS, todayName, weekStartKey, nextWeekStartKey, weekRange } from '../utils/dates';
+import WeekSwitch from '../components/WeekSwitch';
 import { useMealChanges } from '../hooks/useMealChanges';
 
 const FAMILY = '__familia';
 
 const WeeklyMenu = () => {
-  const { weeklyMenu, foods, members, foodGroupLimits, assignMeal, clearWeeklyMenu, isMenuLocked, unlockMenu, lockMenu } = useData();
+  const { menuOf, foods, members, foodGroupLimits, assignMeal, clearWeeklyMenu, isMenuLocked, unlockMenu, lockMenu } = useData();
+  const thisWeek = weekStartKey();
+  const nextWeek = nextWeekStartKey();
+  const [week, setWeek] = useState(thisWeek);
+  const weeklyMenu = menuOf(week);
+  const isNext = week === nextWeek;
   const mealChanges = useMealChanges();
   const [member, setMember] = useState(FAMILY);
   const [picking, setPicking] = useState<{ day: string; meal: string; member: string } | null>(null);
   const [confirmNewWeek, setConfirmNewWeek] = useState(false);
   const [copyFrom, setCopyFrom] = useState<string | null>(null);
-  const today = todayName();
+  const today = isNext ? '' : todayName();
 
   // Si hay datos en tiempos de comida extra (versiones anteriores), también se muestran
   const meals = [...MEALS, ...['Snack', 'Merienda'].filter(m => weeklyMenu.some(w => w.meal === m && w.foodIds.length))];
@@ -24,6 +30,12 @@ const WeeklyMenu = () => {
   const slotFor = (day: string, meal: string, who = member) =>
     weeklyMenu.find(w => w.day === day && w.meal === meal && w.member === who && w.foodIds.length > 0);
   const filled = (who: string) => weeklyMenu.filter(w => w.member === who && w.foodIds.length > 0).length;
+  const countOf = (wk: string) => menuOf(wk).filter(w => w.foodIds.length > 0).length;
+
+  /** Copia todo el menú de esta semana a la próxima (para no empezar de cero) */
+  const copyThisWeek = () => {
+    menuOf(thisWeek).forEach(w => assignMeal(w.day, w.meal, w.foodIds, w.member, w.quantities, nextWeek));
+  };
 
   const kids = members.filter(m => m.role === 'child');
   const isFamily = member === FAMILY;
@@ -47,7 +59,7 @@ const WeeklyMenu = () => {
   const copyDay = (from: string, to: string[]) => {
     meals.forEach(meal => {
       const src = slotFor(from, meal);
-      to.forEach(d => assignMeal(d, meal, src?.foodIds || [], member, src?.quantities || {}));
+      to.forEach(d => assignMeal(d, meal, src?.foodIds || [], member, src?.quantities || {}, week));
     });
     setCopyFrom(null);
   };
@@ -67,12 +79,24 @@ const WeeklyMenu = () => {
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           <Link to="/food" className="btn-secondary" style={{ textDecoration: 'none' }}><BookOpen size={14} /> Platillos</Link>
-          <Link to="/shopping" className="btn-secondary" style={{ textDecoration: 'none' }}><ShoppingCart size={14} /> Lista de súper</Link>
+          <Link to={`/shopping?week=${week}`} className="btn-secondary" style={{ textDecoration: 'none' }}><ShoppingCart size={14} /> Súper de esta lista</Link>
           {weeklyMenu.length > 0 && (
-            <button className="btn-secondary" onClick={() => setConfirmNewWeek(true)}><RefreshCw size={14} /> Nueva semana</button>
+            <button className="btn-secondary" onClick={() => setConfirmNewWeek(true)}><RefreshCw size={14} /> Vaciar semana</button>
           )}
         </div>
       </header>
+
+      <div className="week-bar">
+        <WeekSwitch value={week} onChange={setWeek} note={wk => { const n = countOf(wk); return n ? `${n} comidas` : 'vacía'; }} />
+        {isNext && countOf(nextWeek) === 0 && countOf(thisWeek) > 0 && (
+          <button className="btn-secondary" onClick={copyThisWeek}><Copy size={14} /> Copiar la semana actual</button>
+        )}
+      </div>
+      {isNext && (
+        <p className="notice" style={{ marginBottom: '1rem' }}>
+          Estás planeando la próxima semana ({weekRange(nextWeek)}). La lista del súper puede armarse con este menú.
+        </p>
+      )}
 
       <div className="planner-toolbar">
         <div className="member-tabs" role="tablist">
@@ -81,23 +105,23 @@ const WeeklyMenu = () => {
           </button>
           {members.map(m => (
             <button key={m.id} role="tab" aria-selected={member === m.name} className={`member-tab${member === m.name ? ' on' : ''}`} onClick={() => setMember(m.name)}>
-              {m.avatar} {m.name} <small>{filled(m.name)}</small>{m.role === 'child' && isMenuLocked(m.name) && <Lock size={11} />}
+              {m.avatar} {m.name} <small>{filled(m.name)}</small>{m.role === 'child' && isMenuLocked(m.name, week) && <Lock size={11} />}
             </button>
           ))}
         </div>
       </div>
 
       {memberObj?.role === 'child' && (
-        <div className={`notice${isMenuLocked(member) ? '' : ' warn'}`} style={{ marginBottom: '1rem', alignItems: 'center' }}>
-          {isMenuLocked(member) ? <Lock size={16} /> : <Unlock size={16} />}
+        <div className={`notice${isMenuLocked(member, week) ? '' : ' warn'}`} style={{ marginBottom: '1rem', alignItems: 'center' }}>
+          {isMenuLocked(member, week) ? <Lock size={16} /> : <Unlock size={16} />}
           <span style={{ flex: 1 }}>
-            {isMenuLocked(member)
-              ? <><b>{member} ya confirmó su semana.</b> Si quiere cambiar algo, te llega una solicitud para aprobar. Tú sí puedes editar.</>
-              : <><b>{member} aún no confirma su semana.</b> Puede elegir y cambiar libremente hasta que la confirme.</>}
+            {isMenuLocked(member, week)
+              ? <><b>{member} ya confirmó {isNext ? 'la próxima semana' : 'su semana'}.</b> Si quiere cambiar algo, te llega una solicitud para aprobar. Tú sí puedes editar.</>
+              : <><b>{member} aún no confirma {isNext ? 'la próxima semana' : 'su semana'}.</b> Puede elegir y cambiar libremente hasta que la confirme.</>}
           </span>
-          {isMenuLocked(member)
-            ? <button className="btn-xs" onClick={() => unlockMenu(member)}><Unlock size={12} /> Desbloquear</button>
-            : <button className="btn-xs" onClick={() => lockMenu(member)}><Lock size={12} /> Confirmar por {member}</button>}
+          {isMenuLocked(member, week)
+            ? <button className="btn-xs" onClick={() => unlockMenu(member, week)}><Unlock size={12} /> Desbloquear</button>
+            : <button className="btn-xs" onClick={() => lockMenu(member, week)}><Lock size={12} /> Confirmar por {member}</button>}
         </div>
       )}
 
@@ -220,7 +244,7 @@ const WeeklyMenu = () => {
       )}
 
       {picking && (
-        <FoodPicker mode="parent" member={picking.member} day={picking.day} meal={picking.meal} onClose={() => setPicking(null)} />
+        <FoodPicker mode="parent" member={picking.member} day={picking.day} meal={picking.meal} week={week} onClose={() => setPicking(null)} />
       )}
 
       {copyFrom && (
@@ -250,11 +274,11 @@ const WeeklyMenu = () => {
       {confirmNewWeek && (
         <div className="sheet-overlay" onClick={() => setConfirmNewWeek(false)}>
           <div className="sheet" style={{ maxWidth: '400px' }} onClick={e => e.stopPropagation()}>
-            <div className="sheet-head"><h2 className="sheet-title">¿Empezar una semana nueva?</h2></div>
-            <div className="sheet-body"><p className="text-sm text-muted">Se borra el menú de toda la familia y los topes semanales se reinician. Los platillos del catálogo se quedan.</p></div>
+            <div className="sheet-head"><h2 className="sheet-title">¿Vaciar {isNext ? 'la próxima semana' : 'esta semana'}?</h2></div>
+            <div className="sheet-body"><p className="text-sm text-muted">Se borra el menú de toda la familia de {weekRange(week)} y sus confirmaciones. Los platillos del catálogo se quedan.</p></div>
             <div className="sheet-foot" style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
               <button className="btn-secondary" onClick={() => setConfirmNewWeek(false)}>Cancelar</button>
-              <button className="btn-primary" onClick={() => { clearWeeklyMenu(); setConfirmNewWeek(false); }}>Sí, nueva semana</button>
+              <button className="btn-primary" onClick={() => { clearWeeklyMenu(week); setConfirmNewWeek(false); }}>Sí, vaciar</button>
             </div>
           </div>
         </div>

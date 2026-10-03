@@ -3,7 +3,7 @@ import { Check, Plus, Lock, Clock, X } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import FoodPicker from './FoodPicker';
 import { MEALS, MEAL_EMOJI, foodEmoji, getFoodUsage } from '../utils/food';
-import { WEEK_DAYS, todayName } from '../utils/dates';
+import { WEEK_DAYS, todayName, weekStartKey, nextWeekStartKey, dateInWeek } from '../utils/dates';
 import { sounds } from '../utils/audio';
 import { notify } from '../utils/push';
 
@@ -21,20 +21,22 @@ interface Props {
  */
 const KidMealPlanner = ({ kidName, onPlanned, onLocked, onRequested }: Props) => {
   const {
-    weeklyMenu, foods, toggleAte, foodGroupLimits, isMenuLocked, lockMenu, mealChangeRequests, requestMealChange, cancelMealChange,
+    menuOf, foods, toggleAte, foodGroupLimits, isMenuLocked, lockMenu, mealChangeRequests, requestMealChange, cancelMealChange,
   } = useData();
-  const today = todayName();
-  const todayIdx = WEEK_DAYS.indexOf(today);
-  const [day, setDay] = useState(today);
+  const thisWeek = weekStartKey();
+  const nextWeek = nextWeekStartKey();
+  const [week, setWeekState] = useState(thisWeek);
+  const isNext = week === nextWeek;
+  const weeklyMenu = menuOf(week);
+  const today = isNext ? '' : todayName();
+  const todayIdx = isNext ? -1 : WEEK_DAYS.indexOf(today);
+  const [day, setDay] = useState(todayName());
+  const setWeek = (w: string) => { setWeekState(w); setDay(w === thisWeek ? todayName() : 'Lunes'); };
   const [picking, setPicking] = useState<string | null>(null);
   const [changing, setChanging] = useState<string | null>(null);
   const [replacing, setReplacing] = useState<string | null>(null);
-  const locked = isMenuLocked(kidName);
-
-  // Fechas de la semana actual (lunes a domingo)
-  const monday = new Date();
-  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
-  const dateOf = (i: number) => { const d = new Date(monday); d.setDate(monday.getDate() + i); return d.getDate(); };
+  const locked = isMenuLocked(kidName, week);
+  const dateOf = (i: number) => dateInWeek(week, i).getDate();
 
   const slotFor = (d: string, meal: string) =>
     weeklyMenu.find(w => w.day === d && w.meal === meal && w.member === kidName && w.foodIds.length > 0);
@@ -42,7 +44,7 @@ const KidMealPlanner = ({ kidName, onPlanned, onLocked, onRequested }: Props) =>
   const totalFilled = WEEK_DAYS.reduce((s, d) => s + filledCount(d), 0);
   const totalSlots = WEEK_DAYS.length * MEALS.length;
   const pendingFor = (d: string, meal: string) =>
-    mealChangeRequests.find(r => r.status === 'pending' && r.member === kidName && r.day === d && r.meal === meal);
+    mealChangeRequests.find(r => r.status === 'pending' && r.member === kidName && (r.week || thisWeek) === week && r.day === d && r.meal === meal);
   const isPast = (d: string) => WEEK_DAYS.indexOf(d) < todayIdx;
 
   const usage = getFoodUsage(weeklyMenu, foods, kidName);
@@ -53,14 +55,14 @@ const KidMealPlanner = ({ kidName, onPlanned, onLocked, onRequested }: Props) =>
   };
 
   const confirmWeek = () => {
-    lockMenu(kidName);
+    lockMenu(kidName, week);
     sounds.kidCheer();
     onLocked?.();
-    notify({ to: 'parents', title: `🍽️ ${kidName} confirmó su menú`, body: `Eligió ${totalFilled} comidas de la semana.`, url: '/menu', tag: `menu-${kidName}` });
+    notify({ to: 'parents', title: `🍽️ ${kidName} confirmó su menú${isNext ? ' de la próxima semana' : ''}`, body: `Eligió ${totalFilled} comidas de la semana.`, url: '/menu', tag: `menu-${kidName}` });
   };
 
   const sendRequest = (req: Parameters<typeof requestMealChange>[0], text: string) => {
-    requestMealChange(req);
+    requestMealChange({ ...req, week });
     sounds.save();
     onRequested?.();
     notify({ to: 'parents', title: `🍽️ ${kidName} pide un cambio de comida`, body: text, url: '/', tag: `mealchange-${kidName}-${req.day}-${req.meal}` });
@@ -80,6 +82,13 @@ const KidMealPlanner = ({ kidName, onPlanned, onLocked, onRequested }: Props) =>
         {locked
           ? <span className="kid-lock on"><Lock size={13} /> Confirmada</span>
           : <span className="kid-count">{totalFilled}/{totalSlots}</span>}
+      </div>
+      <div className="kid-weeks" role="tablist" aria-label="Semana">
+        {[{ k: thisWeek, l: '📅 Esta semana' }, { k: nextWeek, l: '🚀 Próxima semana' }].map(w => (
+          <button key={w.k} role="tab" aria-selected={week === w.k} className={week === w.k ? 'on' : ''} onClick={() => setWeek(w.k)}>
+            {w.l}{isMenuLocked(kidName, w.k) ? ' 🔒' : ''}
+          </button>
+        ))}
       </div>
       {!locked && (
         <p className="kid-hint">Elige tu comida de toda la semana y luego confírmala. Si después quieres cambiar algo, le pides permiso a papá o mamá.</p>
@@ -140,12 +149,12 @@ const KidMealPlanner = ({ kidName, onPlanned, onLocked, onRequested }: Props) =>
 
       {!locked && (
         <button className="kid-confirm" onClick={confirmWeek} disabled={totalFilled === 0}>
-          <Lock size={18} /> Confirmar mi semana
+          <Lock size={18} /> {isNext ? 'Confirmar la próxima semana' : 'Confirmar mi semana'}
         </button>
       )}
 
       {picking && (
-        <FoodPicker mode="kid" member={kidName} day={day} meal={picking} onClose={() => setPicking(null)} onSaved={onPlanned} />
+        <FoodPicker mode="kid" member={kidName} day={day} meal={picking} week={week} onClose={() => setPicking(null)} onSaved={onPlanned} />
       )}
 
       {changing && (() => {
@@ -193,7 +202,7 @@ const KidMealPlanner = ({ kidName, onPlanned, onLocked, onRequested }: Props) =>
 
       {replacing && (
         <FoodPicker
-          mode="kid" member={kidName} day={day} meal={replacing} title="¿Qué quieres en su lugar?" submitLabel="Pedir permiso 📨"
+          mode="kid" member={kidName} day={day} meal={replacing} week={week} title="¿Qué quieres en su lugar?" submitLabel="Pedir permiso 📨"
           onClose={() => setReplacing(null)}
           onSubmit={(foodIds, quantities) => sendRequest(
             { member: kidName, day, meal: replacing, kind: 'replace', foodIds, quantities },

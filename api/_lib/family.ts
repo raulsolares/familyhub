@@ -17,7 +17,7 @@ export interface FamilyState {
   familyEvents?: { id: string; title: string; date: string; time?: string; members: string[]; repeat?: { freq: 'daily' | 'weekly' | 'monthly' | 'yearly'; interval?: number; weekdays?: number[]; until?: string } }[];
   mealChangeRequests?: { status: string }[];
   prizeRequests?: { id: string; member: string; status: string }[];
-  weeklyMenu?: { day: string; member: string; foodIds: string[] }[];
+  weeklyMenu?: { day: string; member: string; foodIds: string[]; week?: string }[];
   pushSubscriptions?: PushSub[];
 }
 
@@ -93,7 +93,7 @@ export const dayName = (key: string) => {
   return DAY_NAMES[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
 };
 
-const weekStart = (key: string) => {
+export const weekStart = (key: string) => {
   const [y, m, d] = key.split('-').map(Number);
   const date = new Date(Date.UTC(y, m - 1, d));
   date.setUTCDate(date.getUTCDate() - ((date.getUTCDay() + 6) % 7));

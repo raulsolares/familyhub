@@ -4,6 +4,7 @@ import { UserPlus, Shield, Trash2, Edit2, X, Save, Bell, Sun, Moon } from 'lucid
 import NotificationSettings from '../components/NotificationSettings';
 import { useData } from '../context/DataContext';
 import { useUser } from '../context/UserContext';
+import SyncBadge from '../components/SyncBadge';
 import type { Member, Rule } from '../context/DataContext';
 
 const AVATARS = ['👦', '👧', '🧒', '👶', '👨', '👩', '🧔', '👱‍♀️', '👴', '👵', '🦸', '🧚', '🐶', '🐱', '🦄', '🐼'];
@@ -70,6 +71,8 @@ const Settings = () => {
           <button className={theme === 'dark' ? 'on' : ''} onClick={() => updateTheme('dark')}><Moon size={13} style={{ verticalAlign: '-2px' }} /> Oscuro</button>
         </div>
       </header>
+
+      <div style={{ marginBottom: '1rem' }}><SyncBadge detail /></div>
 
       <div className="member-tabs" role="tablist" style={{ marginBottom: '1.5rem', overflowX: 'auto' }}>
         {[
@@ -158,7 +161,7 @@ const Settings = () => {
           </div>
 
           {showRuleForm && (
-            <form onSubmit={handleRuleSubmit} style={{ background: 'var(--p-background)', padding: '1.5rem', borderRadius: '12px', marginBottom: '1.5rem', border: '1px solid var(--border)', display: 'grid', gridTemplateColumns: '2fr 1fr 100px', gap: '1rem', alignItems: 'end' }}>
+            <form onSubmit={handleRuleSubmit} style={{ background: 'var(--p-background)', padding: '1.5rem', borderRadius: '12px', marginBottom: '1.5rem', border: '1px solid var(--border)', gap: '1rem', alignItems: 'end' }} className="grid-rule">
               <div><label style={{ fontSize: '0.75rem', fontWeight: '700' }}>Descripción</label><input required value={ruleDesc} onChange={e => setRuleDesc(e.target.value)} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border)' }} /></div>
               <div><label style={{ fontSize: '0.75rem', fontWeight: '700' }}>Puntos</label><input required type="number" value={rulePoints} onChange={e => setRulePoints(Number(e.target.value))} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border)' }} /></div>
               <button type="submit" className="btn-primary" style={{ padding: '0.5rem' }}><Save size={18}/></button>

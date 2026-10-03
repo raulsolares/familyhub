@@ -112,7 +112,7 @@ input[type='time'], input[inputmode='numeric'] {
 
 .mobile-topbar, .parent-tabbar { display: none; }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .sidebar { display: none !important; }
   .mobile-topbar {
     display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
@@ -600,6 +600,7 @@ input[type='time'], input[inputmode='numeric'] {
 .hb-cell.wait { background: var(--p-surface-2); border: 1px dashed var(--p-text-subtle); }
 .hb-cell.off { background: transparent; border: 1px dashed var(--border); }
 .hb-cell.nodata { background: transparent; }
+.hb-cell.nodata::after { content: ''; width: 4px; height: 4px; border-radius: 50%; background: var(--border); }
 .hb-streak { font-weight: 700; font-size: 0.8rem; color: #ea580c; font-variant-numeric: tabular-nums; }
 .hb-mood-row th, .hb-mood-row td { padding-top: 0.375rem; }
 .hb-moods { display: inline-flex; flex-direction: column; font-size: 0.7rem; line-height: 1.1; color: var(--p-text-subtle); }
@@ -622,11 +623,52 @@ input[type='time'], input[inputmode='numeric'] {
 .kid-progress-moods { display: inline-flex; gap: 0.2rem; font-size: 1rem; }
 .kid-progress-moods i { font-style: normal; opacity: 0.3; filter: grayscale(1); font-size: 0.85rem; }
 @media (max-width: 560px) {
-  .hb-grid tbody th { white-space: normal; }
-  .hb-name { max-width: 74px; font-size: 0.68rem; line-height: 1.1; display: block; }
-  .hb-grid tbody th .hb-ico { display: block; margin: 0; }
+  .hb-grid tbody th { white-space: normal; padding-right: 0.25rem; }
+  .hb-grid tbody th { display: flex; align-items: center; gap: 0.3rem; min-width: 96px; max-width: 112px; min-height: 26px; }
+  .hb-name {
+    max-width: none; font-size: 0.7rem; line-height: 1.15; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    white-space: normal; overflow: hidden;
+  }
+  .hb-grid tbody th .hb-ico { margin: 0; flex-shrink: 0; font-size: 1rem; }
+  .hb-cell { width: 24px; height: 24px; }
   .hb-mood-lbl { display: none; }
   .hb-mood-day { grid-template-columns: 56px repeat(3, 1fr); }
   .hb-mood-slot { text-align: center; }
   .hb-summary { gap: 0.75rem; }
+}
+
+/* ── Estado de la nube ──────────────────────────────────────────────────────── */
+.sync-badge { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 0.375rem; max-width: 100%; }
+.sync-badge .sync-pill { border: 1px solid var(--border); background: var(--p-surface); border-radius: 999px; padding: 0.25rem 0.625rem; font: inherit; font-size: 0.75rem; cursor: default; }
+.sync-badge.s-synced .sync-pill { color: var(--success); }
+.sync-badge.s-local .sync-pill, .sync-badge.s-error .sync-pill { color: #b45309; background: var(--warning-bg); border-color: var(--warning); cursor: pointer; }
+.sync-help { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; max-width: 420px; font-size: 0.75rem; line-height: 1.4; color: var(--p-text); background: var(--warning-bg); border: 1px solid var(--warning); border-radius: var(--radius); padding: 0.5rem 0.75rem; text-align: left; }
+
+/* ── Selector de semana ─────────────────────────────────────────────────────── */
+.week-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 0.375rem; background: var(--p-surface-2); border-radius: var(--radius-lg); padding: 4px; max-width: 460px; }
+.week-switch button { display: flex; flex-direction: column; align-items: flex-start; gap: 0.1rem; border: none; background: none; border-radius: var(--radius); padding: 0.45rem 0.75rem; cursor: pointer; color: var(--p-text-muted); font: inherit; text-align: left; min-width: 0; }
+.week-switch button b { font-size: 0.85rem; font-weight: 600; }
+.week-switch button small { font-size: 0.7rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.week-switch button.on { background: var(--p-surface); color: var(--p-text); box-shadow: var(--shadow); }
+.week-switch button.on small { color: var(--p-primary); }
+.week-switch.full { max-width: none; }
+.week-bar { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; margin-bottom: 1rem; }
+
+/* Columnas que se apilan en pantallas angostas */
+.split { display: grid; gap: 1.5rem; align-items: start; }
+.split-2-1 { grid-template-columns: 2fr 1fr; }
+.split-side { grid-template-columns: 1fr 320px; }
+.grid-rule { display: grid; grid-template-columns: 2fr 1fr 100px; }
+@media (max-width: 900px) {
+  .split-2-1, .split-side { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .grid-rule { grid-template-columns: 1fr 1fr; }
+  .grid-rule > :first-child { grid-column: 1 / -1; }
+}
+@media (max-width: 560px) { .shop-cat { display: none; } }
+/* En celular el título ocupa todo el ancho y los botones bajan */
+@media (max-width: 560px) {
+  .page-header { flex-wrap: wrap !important; gap: 0.75rem !important; }
+  .page-header > div:first-child { flex: 1 1 100%; min-width: 0; }
 }

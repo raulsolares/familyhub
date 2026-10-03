@@ -26,3 +26,22 @@ export const daysUntil = (key: string) => {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   return Math.round((target.getTime() - today.getTime()) / 86400000);
 };
+
+/** Lunes de la semana siguiente (YYYY-MM-DD) */
+export const nextWeekStartKey = (d: Date = new Date()) => {
+  const copy = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7);
+  return weekStartKey(copy);
+};
+
+/** Fecha (día del mes) de un día de la semana (0 = lunes) dentro de la semana que empieza en `week` */
+export const dateInWeek = (week: string, idx: number) => {
+  const [y, m, d] = week.split('-').map(Number);
+  return new Date(y, m - 1, d + idx);
+};
+
+/** "29 sep – 5 oct" */
+export const weekRange = (week: string) => {
+  const a = dateInWeek(week, 0); const b = dateInWeek(week, 6);
+  const fmt = (d: Date, month: boolean) => d.toLocaleDateString('es-MX', month ? { day: 'numeric', month: 'short' } : { day: 'numeric' });
+  return `${fmt(a, a.getMonth() !== b.getMonth())} – ${fmt(b, true)}`;
+};

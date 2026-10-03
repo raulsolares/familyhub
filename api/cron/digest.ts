@@ -1,7 +1,7 @@
 // GET /api/cron/digest?slot=morning|evening — lo llaman las crons de Vercel (vercel.json).
 // Mañana: resumen del día para papás y niños. Noche: recordatorios de lo que falta.
 import {
-  cronAllowed, dayKey, dayName, daysBetween, loadState, missingConfig, missionsFor, sendTo,
+  cronAllowed, dayKey, dayName, daysBetween, loadState, missingConfig, missionsFor, sendTo, weekStart,
   type FamilyState,
 } from '../_lib/family.js';
 import { occurrences } from '../../src/utils/events.js';
@@ -65,7 +65,10 @@ const evening = async (state: FamilyState) => {
   }
 
   const school = (state.schoolTasks || []).filter(t => !t.completed && (t.eventDate === tomorrow || t.deadline === tomorrow));
-  const noMenu = kids.filter(k => !(state.weeklyMenu || []).some(w => w.member === k.name && w.day === tomorrowName && w.foodIds.length > 0));
+  // El menú de mañana puede ser de la semana siguiente (domingo → lunes); los menús viejos sin semana cuentan como de la actual
+  const tomorrowWeek = weekStart(tomorrow);
+  const noMenu = kids.filter(k => !(state.weeklyMenu || []).some(w =>
+    w.member === k.name && w.day === tomorrowName && w.foodIds.length > 0 && (w.week || weekStart(today)) === tomorrowWeek));
   const lines = [
     ...school.map(t => `🎒 Mañana: ${t.child} · ${t.title}`),
     ...(noMenu.length ? [`🍽️ ${noMenu.map(k => k.name).join(' y ')} sin menú para el ${tomorrowName.toLowerCase()}`] : []),

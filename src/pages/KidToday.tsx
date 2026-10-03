@@ -137,7 +137,7 @@ const KidToday = () => {
   const hh = now.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' });
 
   return (
-    <div className="today">
+    <div className="kid-today">
       {role === 'parent' && kids.length > 1 && (
         <div className="kid-switch">
           {kids.map(k => (

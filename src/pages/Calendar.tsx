@@ -9,6 +9,7 @@ import type { AgendaItem } from '../utils/agenda';
 import { todayKey, daysUntil } from '../utils/dates';
 import EventSheet from '../components/EventSheet';
 import EventForm from '../components/EventForm';
+import SyncBadge from '../components/SyncBadge';
 import FeedForm from '../components/FeedForm';
 
 const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -105,6 +106,8 @@ const Calendar = () => {
           </div>
         )}
       </header>
+
+      {!isKid && <div style={{ marginBottom: '0.75rem' }}><SyncBadge /></div>}
 
       {!isKid && (
         <div className="member-tabs" style={{ marginBottom: '1rem' }}>

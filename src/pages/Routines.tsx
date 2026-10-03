@@ -263,18 +263,18 @@ const Routines = () => {
                 }}>
                   {routine.icon}
                 </div>
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                     <h4 style={{ fontWeight: '700', fontSize: '0.9375rem' }}>{routine.name}</h4>
                     {allDone && <span className="badge badge-green">Completada</span>}
                   </div>
-                  <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.2rem', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: '0.25rem 0.625rem', marginTop: '0.2rem', alignItems: 'center', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '0.75rem', color: 'var(--p-text-muted)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                       <Clock size={11} /> {routine.time}
                     </span>
                     <span className="badge badge-blue">{routine.member}</span>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--p-text-muted)' }}>{describeDays(routine.days)}</span>
-                    {!isRoutineOn(routine, todayStr) && total > 0 && <span className="badge">Hoy no toca</span>}
+                    <span style={{ fontSize: '0.75rem', color: 'var(--p-text-muted)', whiteSpace: 'nowrap' }}>{describeDays(routine.days)}</span>
+                    {!isRoutineOn(routine, todayStr) && total > 0 && <span className="badge" style={{ whiteSpace: 'nowrap' }}>Hoy no toca</span>}
                   </div>
                 </div>
                 {role === 'parent' && (

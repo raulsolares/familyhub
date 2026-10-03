@@ -198,7 +198,7 @@ const FoodManager = () => {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', padding: '1rem', background: 'var(--p-background)', borderRadius: '12px' }}>
+              <div className="grid-3" style={{ gap: '1rem', padding: '1rem', background: 'var(--p-background)', borderRadius: '12px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', marginBottom: '0.4rem' }}><Clock size={12}/> Minutos</label>
                   <input value={prepTime} onChange={(e) => setPrepTime(e.target.value === '' ? '' : Number(e.target.value))} type="number" placeholder="Tiempo" style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border)' }} />

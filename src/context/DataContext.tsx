@@ -42,6 +42,8 @@ export interface Food {
 
 export interface WeeklyMenuItem {
   id: string;
+  /** Lunes (YYYY-MM-DD) de la semana a la que pertenece */
+  week?: string;
   day: string;
   meal: string;
   foodIds: string[];
@@ -156,6 +158,8 @@ export interface CalendarFeed {
 
 export interface MealChangeRequest {
   id: string;
+  /** Lunes de la semana del cambio (por omisión, la actual) */
+  week?: string;
   member: string;
   day: string;
   meal: string;
@@ -280,17 +284,28 @@ interface AppState {
   foodGroupLimits: Record<string, number>;
   pushSubscriptions: PushSubscriptionRecord[];
   calendarFeeds: CalendarFeed[];
-  /** Miembro → lunes (YYYY-MM-DD) de la semana cuyo menú ya confirmó */
+  /** `${miembro}@${lunes}` → lunes de cada semana cuyo menú ya confirmó */
   menuLocks: Record<string, string>;
   mealChangeRequests: MealChangeRequest[];
 }
 
 // ── Context type ─────────────────────────────────────────────────────────────
 
+export interface SyncInfo {
+  /** local: sin Firebase configurado */
+  status: 'local' | 'connecting' | 'synced' | 'error';
+  error?: string;
+  during?: 'read' | 'save';
+  at?: string;
+}
+
 interface DataContextType extends Omit<AppState, 'chores'> {
   chores: Chore[];
   points: { [key: string]: number };
   isCloudEnabled: boolean;
+  /** Estado de la sincronización con la nube */
+  sync: SyncInfo;
+  retrySync: () => void;
 
   addFood: (food: Omit<Food, 'id'>) => void;
   updateFood: (id: string, food: Partial<Food>) => void;
@@ -305,9 +320,11 @@ interface DataContextType extends Omit<AppState, 'chores'> {
   updateCalendarFeed: (id: string, feed: Partial<CalendarFeed>) => void;
   deleteCalendarFeed: (id: string) => void;
 
-  isMenuLocked: (member: string) => boolean;
-  lockMenu: (member: string) => void;
-  unlockMenu: (member: string) => void;
+  /** Menú de una semana (lunes YYYY-MM-DD). `weeklyMenu` es siempre la semana actual */
+  menuOf: (week: string) => WeeklyMenuItem[];
+  isMenuLocked: (member: string, week?: string) => boolean;
+  lockMenu: (member: string, week?: string) => void;
+  unlockMenu: (member: string, week?: string) => void;
   requestMealChange: (req: Omit<MealChangeRequest, 'id' | 'status' | 'date'>) => void;
   resolveMealChange: (id: string, approve: boolean) => void;
   cancelMealChange: (id: string) => void;
@@ -343,9 +360,10 @@ interface DataContextType extends Omit<AppState, 'chores'> {
   deleteRoutine: (id: string) => void;
   toggleRoutineTask: (routineId: string, taskIndex: number, memberName: string) => void;
 
-  assignMeal: (day: string, meal: string, foodIds: string[], member: string, quantities?: { [fid: string]: number }) => void;
+  assignMeal: (day: string, meal: string, foodIds: string[], member: string, quantities?: { [fid: string]: number }, week?: string) => void;
   toggleAte: (id: string) => void;
-  clearWeeklyMenu: () => void;
+  /** Borra el menú de una semana (por omisión, la actual) */
+  clearWeeklyMenu: (week?: string) => void;
 
   addSchoolTask: (task: Omit<SchoolTask, 'id' | 'completed'>) => void;
   updateSchoolTask: (id: string, task: Partial<SchoolTask>) => void;
@@ -451,7 +469,10 @@ const normalize = (base: AppState, data: Record<string, any>): AppState => {
     ...m,
     pin: m.pin || (m.role === 'parent' ? '1234' : undefined),
   }));
-  next.weeklyMenu = next.weeklyMenu.map(m => ({ ...m, quantities: m.quantities || {} }));
+  // Menús de antes de existir semanas: se toman como de la semana actual
+  const thisWeek = weekStartKey();
+  next.weeklyMenu = next.weeklyMenu.map(m => ({ ...m, quantities: m.quantities || {}, week: m.week || thisWeek }));
+  next.menuLocks = Object.fromEntries(Object.entries(next.menuLocks || {}).map(([k, v]) => (k.includes('@') ? [k, v] : [`${k}@${v}`, v])));
   next.schoolTasks = next.schoolTasks.map(t => {
     const legacy = t as SchoolTask & { date?: string };
     return {
@@ -481,47 +502,83 @@ const stripUndefined = <T,>(obj: T): T =>
 
 // ── Provider ─────────────────────────────────────────────────────────────────
 
+/** Mensaje claro para la familia cuando la nube falla */
+const syncErrorText = (err: unknown) => {
+  const code = (err as { code?: string })?.code || '';
+  if (code === 'permission-denied') return 'La nube rechazó los datos. Revisa las reglas de Firestore: deben permitir leer y escribir familyhub/main_state.';
+  if (code === 'unavailable' || code === 'deadline-exceeded') return 'Sin conexión con la nube. Se guarda en este dispositivo y se sube al volver la conexión.';
+  if (code === 'invalid-argument') return 'La nube no aceptó los datos (formato inválido).';
+  if (code === 'resource-exhausted') return 'Se alcanzó el límite de la nube de Firebase.';
+  return (err as Error)?.message || 'No se pudo guardar en la nube.';
+};
+
+const json = (v: unknown) => JSON.stringify(v === undefined ? null : v);
+
 export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [state, setState] = useState<AppState>(loadLocal);
   const [isCloudLoaded, setIsCloudLoaded] = useState(!db);
-  const lastRemoteJson = useRef<string>('');
+  const [sync, setSync] = useState<SyncInfo>({ status: db ? 'connecting' : 'local' });
+  const [retry, setRetry] = useState(0);
+  const [saveTick, setSaveTick] = useState(0);
+  /** Lo último que sabemos que está en la nube, por sección (familyEvents, chores…) */
+  const cloud = useRef<Record<string, string>>({});
+  const inFlight = useRef(false);
 
-  // Escucha cambios en la nube (si Firebase está configurado)
+  // Escucha cambios en la nube (si Firebase está configurado). Si falla, reintenta.
   useEffect(() => {
     if (!db) return;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
     const unsub = onSnapshot(
       doc(db, 'familyhub', 'main_state'),
       (snap) => {
         if (snap.metadata.hasPendingWrites) return; // eco de nuestra propia escritura
         if (snap.exists()) {
           const data = snap.data();
-          setState(prev => {
-            const merged = normalize(prev, data);
-            lastRemoteJson.current = JSON.stringify(stripUndefined(merged));
-            return merged;
-          });
+          Object.keys(data).forEach(k => { cloud.current[k] = json(stripUndefined(data[k])); });
+          setState(prev => normalize(prev, data));
         }
         setIsCloudLoaded(true);
+        setSync(s => (s.status === 'error' && s.during === 'save' ? s : { status: 'synced', at: new Date().toISOString() }));
       },
       (err) => {
         console.error('Firestore no disponible, se usa modo local', err);
         setIsCloudLoaded(true);
+        setSync({ status: 'error', error: syncErrorText(err), during: 'read' });
+        retryTimer = setTimeout(() => setRetry(r => r + 1), 30000);
       },
     );
-    return () => unsub();
-  }, []);
+    return () => { unsub(); if (retryTimer) clearTimeout(retryTimer); };
+  }, [retry]);
 
-  // Persiste localmente siempre, y en la nube cuando hay Firebase
+  // Persiste localmente siempre, y en la nube solo las secciones que cambiaron
+  // (así un dispositivo no borra lo que otro guardó en otra sección)
   useEffect(() => {
-    if (!isCloudLoaded) return;
     const payload = stripUndefined(state);
-    const json = JSON.stringify(payload);
-    try { localStorage.setItem(STORAGE_KEY, json); } catch { /* almacenamiento lleno o bloqueado */ }
-    if (db && json !== lastRemoteJson.current) {
-      lastRemoteJson.current = json;
-      setDoc(doc(db, 'familyhub', 'main_state'), payload).catch(console.error);
-    }
-  }, [state, isCloudLoaded]);
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)); } catch { /* almacenamiento lleno o bloqueado */ }
+    if (!db || !isCloudLoaded || inFlight.current) return;
+    const changed = (Object.keys(payload) as (keyof AppState)[]).filter(k => json(payload[k]) !== cloud.current[k]);
+    if (changed.length === 0) return;
+    const part: Record<string, unknown> = {};
+    changed.forEach(k => { part[k] = payload[k] ?? null; });
+    inFlight.current = true;
+    let ok = false;
+    setDoc(doc(db, 'familyhub', 'main_state'), part, { mergeFields: changed as string[] })
+      .then(() => {
+        ok = true;
+        changed.forEach(k => { cloud.current[k] = json(part[k]); });
+        setSync({ status: 'synced', at: new Date().toISOString() });
+      })
+      .catch(err => {
+        console.error('No se pudo guardar en la nube', err);
+        setSync({ status: 'error', error: syncErrorText(err), during: 'save' });
+      })
+      .finally(() => {
+        inFlight.current = false;
+        // Revisa si hubo cambios mientras se guardaba; si falló, reintenta en 20 s
+        if (ok) setSaveTick(t => t + 1);
+        else setTimeout(() => setSaveTick(t => t + 1), 20000);
+      });
+  }, [state, isCloudLoaded, saveTick]);
 
   // ── Helpers de actualización ───────────────────────────────────────────────
 
@@ -631,12 +688,18 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const assignMeal = (
     d: string, m: string, ids: string[], mem: string,
-    quantities: { [fid: string]: number } = {},
+    quantities: { [fid: string]: number } = {}, week = weekStartKey(),
   ) => patch(s => {
-    const filtered = s.weeklyMenu.filter(x => !(x.day === d && x.meal === m && x.member === mem));
+    // Se guardan la semana pasada, la actual y la siguiente
+    const lastWeek = new Date(); lastWeek.setDate(lastWeek.getDate() - 7);
+    const oldest = weekStartKey(lastWeek);
+    const filtered = s.weeklyMenu.filter(x => (x.week || '') >= oldest && !(x.week === week && x.day === d && x.meal === m && x.member === mem));
     if (!ids.length) return { weeklyMenu: filtered };
-    return { weeklyMenu: [...filtered, { id: uid(), day: d, meal: m, foodIds: ids, quantities, member: mem, ate: false }] };
+    return { weeklyMenu: [...filtered, { id: uid(), week, day: d, meal: m, foodIds: ids, quantities, member: mem, ate: false }] };
   });
+
+  const currentWeek = weekStartKey();
+  const menuOf = (week: string) => state.weeklyMenu.filter(w => (w.week || currentWeek) === week);
 
   const setFoodGroupLimit = (group: string, limit: number | null) => patch(s => {
     const next = { ...s.foodGroupLimits };
@@ -648,9 +711,12 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   return (
     <DataContext.Provider value={{
       ...state,
+      weeklyMenu: menuOf(currentWeek),
       chores,
       points,
       isCloudEnabled: !!db,
+      sync,
+      retrySync: () => { setRetry(r => r + 1); setSaveTick(t => t + 1); },
 
       addFood: (f) => addTo('foods', f),
       updateFood: (id, f) => updateIn('foods', id, f),
@@ -672,10 +738,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       updateCalendarFeed: (id, f) => updateIn('calendarFeeds', id, f),
       deleteCalendarFeed: (id) => removeFrom('calendarFeeds', id),
 
-      isMenuLocked: (member) => state.menuLocks[member] === weekStartKey(),
-      lockMenu: (member) => patch(s => ({ menuLocks: { ...s.menuLocks, [member]: weekStartKey() } })),
-      unlockMenu: (member) => patch(s => {
-        const next = { ...s.menuLocks }; delete next[member];
+      menuOf,
+      isMenuLocked: (member, week = currentWeek) => !!state.menuLocks[`${member}@${week}`],
+      lockMenu: (member, week = weekStartKey()) => patch(s => ({ menuLocks: { ...s.menuLocks, [`${member}@${week}`]: week } })),
+      unlockMenu: (member, week = weekStartKey()) => patch(s => {
+        const next = { ...s.menuLocks }; delete next[`${member}@${week}`];
         return { menuLocks: next };
       }),
       requestMealChange: (r) => patch(s => ({
@@ -690,10 +757,12 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         if (!req || req.status !== 'pending') return {};
         const requests = s.mealChangeRequests.map(r => (r.id === id ? { ...r, status: approve ? 'approved' as const : 'rejected' as const } : r));
         if (!approve) return { mealChangeRequests: requests };
-        const find = (day: string) => s.weeklyMenu.find(w => w.day === day && w.meal === req.meal && w.member === req.member);
-        const without = (list: WeeklyMenuItem[], day: string) => list.filter(w => !(w.day === day && w.meal === req.meal && w.member === req.member));
+        const wk = req.week || weekStartKey();
+        const same = (w: WeeklyMenuItem, day: string) => (w.week || wk) === wk && w.day === day && w.meal === req.meal && w.member === req.member;
+        const find = (day: string) => s.weeklyMenu.find(w => same(w, day));
+        const without = (list: WeeklyMenuItem[], day: string) => list.filter(w => !same(w, day));
         const slot = (day: string, foodIds: string[], quantities: Record<string, number>): WeeklyMenuItem[] =>
-          foodIds.length ? [{ id: uid(), day, meal: req.meal, member: req.member, foodIds, quantities, ate: false }] : [];
+          foodIds.length ? [{ id: uid(), week: wk, day, meal: req.meal, member: req.member, foodIds, quantities, ate: false }] : [];
         let weeklyMenu = without(s.weeklyMenu, req.day);
         if (req.kind === 'swap' && req.swapDay) {
           const a = find(req.day); const b = find(req.swapDay);
@@ -738,7 +807,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
       assignMeal,
       toggleAte: (id) => patch(s => ({ weeklyMenu: s.weeklyMenu.map(x => (x.id === id ? { ...x, ate: !x.ate } : x)) })),
-      clearWeeklyMenu: () => patch(() => ({ weeklyMenu: [], menuLocks: {}, mealChangeRequests: [] })),
+      clearWeeklyMenu: (week = weekStartKey()) => patch(s => ({
+        weeklyMenu: s.weeklyMenu.filter(w => (w.week || week) !== week),
+        menuLocks: Object.fromEntries(Object.entries(s.menuLocks).filter(([, v]) => v !== week)),
+        mealChangeRequests: s.mealChangeRequests.filter(r => (r.week || weekStartKey()) !== week),
+      })),
 
       addSchoolTask: (t) => addTo('schoolTasks', { ...t, completed: false }),
       updateSchoolTask: (id, t) => updateIn('schoolTasks', id, t),

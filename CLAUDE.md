@@ -38,6 +38,10 @@ CRON_SECRET=             # opcional; Vercel lo manda a las crons
 
 Las llaves se generan con `npx web-push generate-vapid-keys`.
 
+Las variables `VITE_FIREBASE_*` deben estar en Vercel tanto en **Production** como en **Preview**; si faltan, esa versión guarda solo en el dispositivo y el aviso `SyncBadge` lo dice (Dashboard, Calendario, Configuración).
+
+Para probar la sincronización localmente con el emulador de Firestore: `VITE_FIRESTORE_EMULATOR=localhost:8080` (solo desarrollo).
+
 Sin estas variables, la app guarda todo en `localStorage` (clave `fh_state_v2`) de ese dispositivo. Con Firebase, además sincroniza en tiempo real entre dispositivos. En el primer arranque se cargan datos de ejemplo (`src/data/seed.ts`).
 
 ## Arquitectura
@@ -61,6 +65,8 @@ Sin estas variables, la app guarda todo en `localStorage` (clave `fh_state_v2`) 
 
 ### Comida semanal con aprobación
 
+- Semanas: cada `WeeklyMenuItem` lleva `week` (lunes YYYY-MM-DD). `weeklyMenu` del contexto es siempre la semana actual; `menuOf(week)` da cualquier semana. Se guardan la semana pasada, la actual y la próxima. `WeekSwitch` cambia entre esta semana y la próxima (Menú semanal, Súper, Modo súper); el súper (`useShoppingWeek`, `?week=`) usa la próxima si ya tiene menú. Los bloqueos son `menuLocks["miembro@lunes"]`.
+
 - El niño elige su semana y la confirma (`menuLocks[miembro] = lunes de la semana`). Ya confirmada, cada cambio es una `MealChangeRequest` (`swap` con otro día o `replace` por otros platillos) que los papás aprueban en el Dashboard o en Menú semanal (`useMealChanges`), con aviso push en ambos sentidos. `clearWeeklyMenu` reinicia bloqueos y solicitudes.
 
 ### Interfaz de niños (cabina espacial)
@@ -82,7 +88,7 @@ Todo el estado de la aplicación vive en **dos contextos**:
 
 1. **`UserContext`** (`src/context/UserContext.tsx`): Sesión local (sin Firebase Auth). La pantalla de acceso muestra los miembros de `DataContext`; los papás entran con PIN (inicial `1234`, editable en Configuración → Familia) y los niños entran directo salvo que se les ponga PIN. Persiste en `localStorage` (`fh_auth`, `fh_user`). Gestiona el tema activo (`light` | `dark` | `fun`).
 
-2. **`DataContext`** (`src/context/DataContext.tsx`): Toda la data de la app en un solo objeto de estado. Siempre se guarda en `localStorage`; si hay Firebase, se sincroniza con un **único documento Firestore** en `familyhub/main_state` (`onSnapshot` + `setDoc`, ignorando ecos propios). `normalize()` migra datos de versiones anteriores.
+2. **`DataContext`** (`src/context/DataContext.tsx`): Toda la data de la app en un solo objeto de estado. Siempre se guarda en `localStorage`; si hay Firebase, se sincroniza con un **único documento Firestore** en `familyhub/main_state` (`onSnapshot` + `setDoc` con `mergeFields` solo de las secciones que cambiaron contra la última copia de la nube, para que dos dispositivos no se pisen). `sync` (`local|connecting|synced|error`) y `retrySync()` alimentan `SyncBadge`; si falla, reintenta solo. `normalize()` migra datos de versiones anteriores.
    - Tareas (`Chore`): el estado `Hecho/Pendiente` se deriva de `lastDone`; las diarias se reinician cada día y las semanales (freq contiene "seman") cada lunes.
    - Puntos: cada `PointLog` automático lleva `sourceKey` para no duplicar y para revertirse al desmarcar.
    - Comida: `Food.maxPerWeek` (por platillo) y `foodGroupLimits` (por `Food.group`) limitan lo que cada niño elige por semana (`src/utils/food.ts`).

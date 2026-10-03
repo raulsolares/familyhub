@@ -11,13 +11,14 @@ import { usePush } from '../hooks/usePush';
 import { useNotifications } from '../hooks/useNotifications';
 import { getLevel, getStreak } from '../utils/gamification';
 import { MEALS, MEAL_EMOJI, foodEmoji } from '../utils/food';
-import { todayKey, todayName, daysUntil, WEEK_DAYS } from '../utils/dates';
+import { todayKey, todayName, daysUntil, WEEK_DAYS, nextWeekStartKey } from '../utils/dates';
 import { notify } from '../utils/push';
 import { useCalendarFeeds } from '../hooks/useCalendarFeeds';
 import { useMealChanges } from '../hooks/useMealChanges';
 import { buildAgenda } from '../utils/agenda';
 import type { AgendaItem } from '../utils/agenda';
 import EventSheet from '../components/EventSheet';
+import SyncBadge from '../components/SyncBadge';
 import { todayMissions, habitsOn, dayScore, dayStreak } from '../utils/habits';
 import { MOOD_SLOTS, moodById } from '../utils/mood';
 
@@ -38,8 +39,8 @@ const Dashboard = () => {
   const { viewMode, user } = useUser();
   const data = useData();
   const {
-    schoolTasks, weeklyMenu, foods, chores, members, prizeRequests, prizes, familyEvents, routines,
-    routineLogs, pointLogs, points, customShoppingItems, isCloudEnabled, resolvePrizeRequest, choreLogs, habitsSince, moodLogs,
+    schoolTasks, weeklyMenu, menuOf, foods, chores, members, prizeRequests, prizes, familyEvents, routines,
+    routineLogs, pointLogs, points, customShoppingItems, resolvePrizeRequest, choreLogs, habitsSince, moodLogs,
   } = data;
   const push = usePush();
   useNotifications(schoolTasks);
@@ -84,7 +85,9 @@ const Dashboard = () => {
 
   // ── Pendientes de atención ─────────────────────────────────────────────────
   const pendingPrizes = prizeRequests.filter(r => r.status === 'pending');
-  const kidsWithoutTomorrow = kids.filter(k => !weeklyMenu.some(w => w.day === tomorrowName && w.member === k.name && w.foodIds.length > 0));
+  // El domingo, "mañana" ya es la semana siguiente
+  const tomorrowMenu = dayName === 'Domingo' ? menuOf(nextWeekStartKey()) : weeklyMenu;
+  const kidsWithoutTomorrow = kids.filter(k => !tomorrowMenu.some(w => w.day === tomorrowName && w.member === k.name && w.foodIds.length > 0));
 
   const shoppingCount = new Set(
     weeklyMenu.flatMap(s => s.foodIds.flatMap(fid => foods.find(f => f.id === fid)?.ingredients.map(i => i.name.toLowerCase()) || [])),
@@ -116,7 +119,7 @@ const Dashboard = () => {
           <p style={{ textTransform: 'capitalize' }}>{new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
         </div>
         <div className="dash-hello-actions">
-          <span className="sync-pill"><i style={{ background: isCloudEnabled ? 'var(--success)' : 'var(--warning)' }} />{isCloudEnabled ? 'Sincronizado' : 'Solo este dispositivo'}</span>
+          <SyncBadge />
           {push.supported && push.configured && !push.enabled && (
             <button className="btn-secondary" onClick={() => push.enable()} disabled={push.busy}><Bell size={14} /> Activar notificaciones</button>
           )}

@@ -530,7 +530,7 @@
 @media (max-width: 520px) { .kid-actions { grid-template-columns: repeat(2, 1fr); } }
 
 /* ── Agenda del día ─────────────────────────────────────────────────────────── */
-.today { display: flex; flex-direction: column; gap: 1rem; max-width: 820px; margin: 0 auto; }
+.kid-today { display: flex; flex-direction: column; gap: 1rem; max-width: 820px; margin: 0 auto; }
 .today-clock { display: flex; align-items: baseline; gap: 0.75rem; margin-bottom: 0.75rem; }
 .today-clock-time { font-family: var(--sp-hud); font-weight: 900; font-size: 2.4rem; color: #fff; text-shadow: 0 0 18px rgba(34, 211, 238, 0.6); font-variant-numeric: tabular-nums; }
 .today-clock-day { font-family: var(--sp-hud); font-size: 0.8rem; color: var(--sp-cyan-soft); letter-spacing: 0.08em; text-transform: uppercase; flex: 1; }
@@ -630,4 +630,16 @@
 
 @media (prefers-reduced-motion: reduce) {
   .tl-item.now .tl-node { animation: none; }
+}
+
+/* ── Semana de comida (actual / próxima) ───────────────────────────────────── */
+.kid-weeks { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; margin-bottom: 0.75rem; }
+.kid-weeks button {
+  padding: 0.55rem 0.5rem; border-radius: 12px; border: 1px solid var(--sp-line); background: rgba(5, 8, 22, 0.5);
+  color: var(--sp-muted); font: inherit; font-weight: 800; font-size: 0.85rem; cursor: pointer;
+}
+.kid-weeks button.on { border-color: var(--sp-cyan); color: #fff; background: rgba(34, 211, 238, 0.14); box-shadow: 0 0 14px rgba(34, 211, 238, 0.3); }
+@media (max-width: 560px) {
+  .theme-fun .hb-cell { width: 26px; height: 26px; }
+  .theme-fun .hb-ico { font-size: 1.1rem; }
 }
