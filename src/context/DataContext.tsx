@@ -207,8 +207,20 @@ export interface Member {
   name: string;
   role: 'parent' | 'child';
   avatar: string;
-  /** PIN de acceso. Opcional para niños. */
+  /** PIN anterior: solo sirve para que un papá cree su contraseña la primera vez */
   pin?: string;
+  /** Contraseña de papás (PBKDF2-SHA256, base64) */
+  passwordHash?: string;
+  passwordSalt?: string;
+}
+
+/** Dispositivo que un papá autorizó para usar la app */
+export interface AuthorizedDevice {
+  id: string;
+  name: string;
+  authorizedBy: string;
+  authorizedAt: string;
+  lastSeen?: string;
 }
 
 export interface Prize {
@@ -287,6 +299,7 @@ interface AppState {
   /** `${miembro}@${lunes}` → lunes de cada semana cuyo menú ya confirmó */
   menuLocks: Record<string, string>;
   mealChangeRequests: MealChangeRequest[];
+  devices: AuthorizedDevice[];
 }
 
 // ── Context type ─────────────────────────────────────────────────────────────
@@ -306,6 +319,8 @@ interface DataContextType extends Omit<AppState, 'chores'> {
   /** Estado de la sincronización con la nube */
   sync: SyncInfo;
   retrySync: () => void;
+  /** Ya se leyó la nube (o no hay nube): los datos de acceso son confiables */
+  authReady: boolean;
 
   addFood: (food: Omit<Food, 'id'>) => void;
   updateFood: (id: string, food: Partial<Food>) => void;
@@ -354,6 +369,10 @@ interface DataContextType extends Omit<AppState, 'chores'> {
 
   addMember: (member: Omit<Member, 'id'>) => void;
   updateMember: (id: string, member: Partial<Member>) => void;
+
+  addDevice: (device: AuthorizedDevice) => void;
+  updateDevice: (id: string, device: Partial<AuthorizedDevice>) => void;
+  removeDevice: (id: string) => void;
 
   addRoutine: (routine: Omit<Routine, 'id'>) => void;
   updateRoutine: (id: string, routine: Partial<Routine>) => void;
@@ -456,6 +475,7 @@ const seedState = (): AppState => ({
   calendarFeeds: [],
   menuLocks: {},
   mealChangeRequests: [],
+  devices: [],
 });
 
 /** Acepta datos guardados (local o nube) de versiones anteriores y los normaliza */
@@ -467,7 +487,8 @@ const normalize = (base: AppState, data: Record<string, any>): AppState => {
   });
   next.members = next.members.map(m => ({
     ...m,
-    pin: m.pin || (m.role === 'parent' ? '1234' : undefined),
+    // PIN inicial solo para que un papá sin contraseña pueda crearla
+    pin: m.role === 'parent' && !m.passwordHash ? m.pin || '1234' : undefined,
   }));
   // Menús de antes de existir semanas: se toman como de la semana actual
   const thisWeek = weekStartKey();
@@ -715,6 +736,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       chores,
       points,
       isCloudEnabled: !!db,
+      authReady: !db || (isCloudLoaded && sync.during !== 'read'),
       sync,
       retrySync: () => { setRetry(r => r + 1); setSaveTick(t => t + 1); },
 
@@ -799,6 +821,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
       addMember: (m) => addTo('members', m),
       updateMember: (id, m) => updateIn('members', id, m),
+
+      addDevice: (d) => patch(s => ({ devices: [...s.devices.filter(x => x.id !== d.id), d] })),
+      updateDevice: (id, d) => updateIn('devices', id, d),
+      removeDevice: (id) => removeFrom('devices', id),
 
       addRoutine: (r) => addTo('routines', { ...r, since: todayKey() }),
       updateRoutine: (id, r) => updateIn('routines', id, r),

@@ -1,4 +1,5 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
+import { sessionEnd } from '../utils/auth';
 import type { ReactNode } from 'react';
 
 type Role = 'parent' | 'child';
@@ -22,6 +23,8 @@ interface UserContextType {
   login: (member: { id: string; name: string; avatar: string; role: Role }) => void;
   logout: () => void;
   isLoggedIn: boolean;
+  /** Cuándo vence la sesión de papá (ms); null para niños */
+  sessionExpires: number | null;
   updateTheme: (theme: Theme) => void;
   enterKidView: () => void;
   exitKidView: () => void;
@@ -29,14 +32,27 @@ interface UserContextType {
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
+const SESSION_KEY = 'fh_session_exp';
+const readExpiry = () => Number(localStorage.getItem(SESSION_KEY)) || 0;
+/** La sesión guardada sigue vigente: niños siempre; papás solo dentro de sus 7 días */
+const savedSessionValid = () => {
+  if (localStorage.getItem('fh_auth') !== 'true') return false;
+  try {
+    const u = JSON.parse(localStorage.getItem('fh_user') || 'null');
+    if (!u) return false;
+    return u.role === 'child' || readExpiry() > Date.now();
+  } catch { return false; }
+};
+
 export const UserProvider = ({ children }: { children: ReactNode }) => {
-  const [isLoggedIn, setIsLoggedIn] = useState(
-    () => localStorage.getItem('fh_auth') === 'true',
-  );
+  const [isLoggedIn, setIsLoggedIn] = useState(savedSessionValid);
   const [user, setUser] = useState<User | null>(() => {
+    if (!savedSessionValid()) return null;
     const saved = localStorage.getItem('fh_user');
     return saved ? JSON.parse(saved) : null;
   });
+  const [sessionExpires, setSessionExpires] = useState<number | null>(() =>
+    savedSessionValid() && JSON.parse(localStorage.getItem('fh_user') || '{}').role === 'parent' ? readExpiry() : null);
   const [isKidView, setIsKidView] = useState(false);
 
   const login = (member: { id: string; name: string; avatar: string; role: Role }) => {
@@ -48,20 +64,35 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       role: member.role,
       theme: member.role === 'child' ? 'fun' : 'light',
     };
+    const exp = member.role === 'parent' ? sessionEnd() : null;
     setUser(newUser);
     setIsLoggedIn(true);
     setIsKidView(false);
+    setSessionExpires(exp);
     localStorage.setItem('fh_auth', 'true');
     localStorage.setItem('fh_user', JSON.stringify(newUser));
+    if (exp) localStorage.setItem(SESSION_KEY, String(exp));
+    else localStorage.removeItem(SESSION_KEY);
   };
 
   const logout = () => {
     setIsLoggedIn(false);
     setUser(null);
     setIsKidView(false);
+    setSessionExpires(null);
     localStorage.removeItem('fh_auth');
     localStorage.removeItem('fh_user');
+    localStorage.removeItem(SESSION_KEY);
   };
+
+  // La sesión de papá vence a los 7 días aunque la app siga abierta
+  useEffect(() => {
+    if (!sessionExpires) return;
+    const check = () => { if (Date.now() >= sessionExpires) logout(); };
+    const timer = setInterval(check, 60_000);
+    document.addEventListener('visibilitychange', check);
+    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', check); };
+  }, [sessionExpires]);
 
   const updateTheme = (theme: Theme) => {
     if (!user) return;
@@ -93,6 +124,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       login,
       logout,
       isLoggedIn,
+      sessionExpires,
       updateTheme,
       enterKidView,
       exitKidView,

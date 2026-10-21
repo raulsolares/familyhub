@@ -18,12 +18,22 @@ import PrepView from './pages/PrepView';
 import Calendar from './pages/Calendar';
 import Login from './pages/Login';
 import { useUser } from './context/UserContext';
+import { useData } from './context/DataContext';
+import { deviceId } from './utils/auth';
 import './styles/App.css';
 import './styles/design.css';
 import './styles/space.css';
 
 const App = () => {
-  const { isLoggedIn } = useUser();
+  const { isLoggedIn: loggedIn, logout } = useUser();
+  const { devices, authReady } = useData();
+  // Si un papá quita este dispositivo, se cierra la sesión aquí
+  const revoked = authReady && !devices.some(d => d.id === deviceId());
+  const isLoggedIn = loggedIn && !revoked;
+
+  useEffect(() => {
+    if (loggedIn && revoked) logout();
+  }, [loggedIn, revoked, logout]);
 
   useEffect(() => {
     if ('serviceWorker' in navigator) {

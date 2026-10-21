@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { UserPlus, Shield, Trash2, Edit2, X, Save, Bell, Sun, Moon } from 'lucide-react';
+import { UserPlus, Shield, Trash2, Edit2, X, Save, Bell, Sun, Moon, Lock } from 'lucide-react';
+import SecuritySettings from '../components/SecuritySettings';
+import { hashPassword, passwordProblem, MIN_PASSWORD } from '../utils/auth';
 import NotificationSettings from '../components/NotificationSettings';
 import { useData } from '../context/DataContext';
 import { useUser } from '../context/UserContext';
@@ -18,7 +20,7 @@ const Settings = () => {
     updateMember, addMember,
   } = useData();
 
-  type Tab = 'members' | 'rules' | 'notifications';
+  type Tab = 'members' | 'rules' | 'notifications' | 'security';
   const [activeTab, setActiveTab] = useState<Tab>('members');
 
   // Miembros
@@ -27,23 +29,31 @@ const Settings = () => {
   const [mName, setMName] = useState('');
   const [mRole, setMRole] = useState<Member['role']>('child');
   const [mAvatar, setMAvatar] = useState(AVATARS[0]);
-  const [mPin, setMPin] = useState('');
+  const [mPw, setMPw] = useState('');
+  const [mError, setMError] = useState('');
 
   const openMember = (m: Member | null) => {
     setEditingMember(m);
     setMName(m?.name || ''); setMRole(m?.role || 'child');
-    setMAvatar(m?.avatar || AVATARS[0]); setMPin(m?.pin || '');
+    setMAvatar(m?.avatar || AVATARS[0]); setMPw(''); setMError('');
     setShowMemberForm(true);
   };
 
-  const handleMemberSubmit = (e: FormEvent) => {
+  const handleMemberSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    const pin = mPin.trim() || undefined;
+    const role = editingMember?.role ?? mRole;
+    // Papás: contraseña obligatoria al crearlos; al editar, solo si se quiere cambiar
+    let pw = {};
+    if (role === 'parent' && (mPw || !editingMember)) {
+      const problem = passwordProblem(mPw, mPw);
+      if (problem) { setMError(problem); return; }
+      pw = { ...(await hashPassword(mPw)), pin: undefined };
+    }
     if (editingMember) {
-      updateMember(editingMember.id, { avatar: mAvatar, pin });
+      updateMember(editingMember.id, { avatar: mAvatar, ...pw });
     } else {
-      if (members.some(m => m.name.toLowerCase() === mName.trim().toLowerCase())) return;
-      addMember({ name: mName.trim(), role: mRole, avatar: mAvatar, pin });
+      if (members.some(m => m.name.toLowerCase() === mName.trim().toLowerCase())) { setMError('Ya hay alguien con ese nombre.'); return; }
+      addMember({ name: mName.trim(), role: mRole, avatar: mAvatar, ...pw });
     }
     setShowMemberForm(false);
   };
@@ -79,6 +89,7 @@ const Settings = () => {
           { id: 'members', label: 'Familia', icon: UserPlus },
           { id: 'rules', label: 'Retos y logros', icon: Shield },
           { id: 'notifications', label: 'Notificaciones', icon: Bell },
+          { id: 'security', label: 'Seguridad', icon: Lock },
         ].map(tab => (
           <button key={tab.id} role="tab" aria-selected={activeTab === tab.id} className={`member-tab${activeTab === tab.id ? ' on' : ''}`} onClick={() => setActiveTab(tab.id as Tab)}>
             <tab.icon size={15} style={{ verticalAlign: '-3px' }} /> {tab.label}
@@ -87,6 +98,7 @@ const Settings = () => {
       </div>
 
       {activeTab === 'notifications' && <NotificationSettings />}
+      {activeTab === 'security' && <SecuritySettings />}
 
       {/* Miembros */}
       {activeTab === 'members' && (
@@ -98,7 +110,7 @@ const Settings = () => {
                 <div style={{ flex: 1 }}>
                   <h3 style={{ fontWeight: '900' }}>{m.name}</h3>
                   <span className="badge badge-blue">{m.role === 'parent' ? 'Papá/Mamá' : 'Hijo/a'}</span>
-                  <span className="text-xs text-muted" style={{ marginLeft: '0.5rem' }}>{m.pin ? '🔒 Con PIN' : 'Sin PIN'}</span>
+                  <span className="text-xs text-muted" style={{ marginLeft: '0.5rem' }}>{m.role === 'child' ? 'Entra directo' : m.passwordHash ? '🔒 Con contraseña' : 'Falta crear contraseña'}</span>
                 </div>
                 <button onClick={() => openMember(m)} aria-label={`Editar ${m.name}`} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><Edit2 size={18} color="var(--p-text-muted)"/></button>
               </div>
@@ -135,15 +147,16 @@ const Settings = () => {
                       ))}
                     </div>
                   </div>
-                  <div className="form-group">
-                    <label className="form-label">PIN (4 a 6 números){(editingMember?.role ?? mRole) === 'child' ? ' · opcional' : ' *'}</label>
-                    <input
-                      inputMode="numeric" pattern="[0-9]{4,6}" maxLength={6}
-                      required={(editingMember?.role ?? mRole) === 'parent'}
-                      value={mPin} onChange={e => setMPin(e.target.value.replace(/[^0-9]/g, ''))}
-                      placeholder={(editingMember?.role ?? mRole) === 'child' ? 'Vacío = entra sin PIN' : '1234'}
-                    />
-                  </div>
+                  {(editingMember?.role ?? mRole) === 'parent' ? (
+                    <div className="form-group">
+                      <label className="form-label">{editingMember ? 'Nueva contraseña · opcional' : 'Contraseña *'}</label>
+                      <input type="password" autoComplete="new-password" value={mPw} onChange={e => { setMPw(e.target.value); setMError(''); }}
+                        required={!editingMember} placeholder={editingMember ? 'Vacío = no cambiar' : `Al menos ${MIN_PASSWORD} caracteres con letras`} />
+                    </div>
+                  ) : (
+                    <p className="auth-hint">Los niños entran directo en los dispositivos que un papá ya autorizó.</p>
+                  )}
+                  {mError && <p role="alert" style={{ color: 'var(--danger)', fontSize: '0.85rem', fontWeight: 700, margin: 0 }}>{mError}</p>}
                   <button type="submit" className="btn-primary" style={{ justifyContent: 'center' }}><Save size={15} /> Guardar</button>
                 </form>
               </div>

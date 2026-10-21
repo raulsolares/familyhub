@@ -86,7 +86,10 @@ Sin estas variables, la app guarda todo en `localStorage` (clave `fh_state_v2`) 
 
 Todo el estado de la aplicación vive en **dos contextos**:
 
-1. **`UserContext`** (`src/context/UserContext.tsx`): Sesión local (sin Firebase Auth). La pantalla de acceso muestra los miembros de `DataContext`; los papás entran con PIN (inicial `1234`, editable en Configuración → Familia) y los niños entran directo salvo que se les ponga PIN. Persiste en `localStorage` (`fh_auth`, `fh_user`). Gestiona el tema activo (`light` | `dark` | `fun`).
+1. **`UserContext`** (`src/context/UserContext.tsx`): Sesión local (sin Firebase Auth). Persiste en `localStorage` (`fh_auth`, `fh_user`, `fh_session_exp`). La sesión de papás vence a los 7 días (`SESSION_DAYS`); la de niños no. Gestiona el tema activo (`light` | `dark` | `fun`).
+   - Acceso (`src/utils/auth.ts`, `pages/Login.tsx`): cada navegador tiene un id (`fh_device_id`) y solo funciona si está en `devices` (dispositivos autorizados, en el estado compartido). Un dispositivo nuevo solo muestra a los papás; uno entra con su contraseña y lo autoriza. En un dispositivo autorizado los niños entran directo. Si se quita un dispositivo en Configuración → Seguridad (`SecuritySettings`), se cierra la sesión ahí.
+   - Contraseña de papás: `Member.passwordHash/passwordSalt` (PBKDF2-SHA256 con WebCrypto). La primera vez se crea validando el PIN anterior (`Member.pin`, inicial `1234`), que luego se borra. Salir de "Ver como niño" pide la contraseña (`ParentUnlock`).
+   - Todo se valida en el navegador: protege el uso diario, no la base de datos (Firestore sigue abierta).
 
 2. **`DataContext`** (`src/context/DataContext.tsx`): Toda la data de la app en un solo objeto de estado. Siempre se guarda en `localStorage`; si hay Firebase, se sincroniza con un **único documento Firestore** en `familyhub/main_state` (`onSnapshot` + `setDoc` con `mergeFields` solo de las secciones que cambiaron contra la última copia de la nube, para que dos dispositivos no se pisen). `sync` (`local|connecting|synced|error`) y `retrySync()` alimentan `SyncBadge`; si falla, reintenta solo. `normalize()` migra datos de versiones anteriores.
    - Tareas (`Chore`): el estado `Hecho/Pendiente` se deriva de `lastDone`; las diarias se reinician cada día y las semanales (freq contiene "seman") cada lunes.
@@ -132,4 +135,4 @@ Todas las interfaces del dominio están en `DataContext.tsx`: `Food`, `WeeklyMen
 ## Pendientes Conocidos
 
 - Audio: sistema de assets de audio reales (actualmente mocks).
-- Reglas de seguridad de Firestore (actualmente abiertas).
+- Reglas de seguridad de Firestore (actualmente abiertas). Cerrarlas requiere Firebase Auth en la app y el Admin SDK en `api/`.
