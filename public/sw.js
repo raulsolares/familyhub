@@ -1,4 +1,4 @@
-const CACHE_NAME = 'familyhub-v1';
+const CACHE_NAME = 'familyhub-v2';
 const STATIC_ASSETS = ['/', '/index.html'];
 
 self.addEventListener('install', (event) => {
@@ -20,6 +20,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   // Solo cachear GET, ignorar requests de Firebase/Firestore
   if (event.request.method !== 'GET') return;
+  if (new URL(event.request.url).pathname.startsWith('/api/')) return;
   if (event.request.url.includes('firestore') || event.request.url.includes('googleapis')) return;
 
   event.respondWith(

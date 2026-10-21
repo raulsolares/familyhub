@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { CheckCircle2, Circle, ArrowLeft, MessageSquare, Package, Tag, DollarSign, Check } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useData } from '../context/DataContext';
+import { useShoppingWeek } from '../hooks/useShoppingWeek';
+import WeekSwitch from '../components/WeekSwitch';
 import type { Food, Product } from '../context/DataContext';
 
 interface ShoppingItem {
@@ -18,16 +20,24 @@ interface ShoppingItem {
 
 const ShoppingMode = () => {
   const {
-    weeklyMenu, foods, products, addProduct, updateProduct,
+    foods, products, addProduct, updateProduct,
     shoppingNotes, customShoppingItems, updateCustomShoppingItem,
     extraItems, addExtraItem, updateExtraItem,
   } = useData();
+  const { week, setWeek, menu: weeklyMenu } = useShoppingWeek();
 
-  const [items, setItems] = useState<ShoppingItem[]>([]);
+  // Lo marcado como comprado sobrevive recargas mientras se está en el súper
+  const [boughtKeys, setBoughtKeys] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('fh_shop_bought') || '[]'); } catch { return []; }
+  });
+  const saveBought = (next: string[]) => {
+    setBoughtKeys(next);
+    try { localStorage.setItem('fh_shop_bought', JSON.stringify(next)); } catch { /* sin almacenamiento */ }
+  };
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
   const [tempPrice, setTempPrice] = useState<string>('');
 
-  useEffect(() => {
+  const buildItems = (): ShoppingItem[] => {
     const agg = new Map<string, { name: string; qty: number; unit: string }>();
     weeklyMenu.forEach(slot => {
       slot.foodIds.forEach(fid => {
@@ -42,10 +52,10 @@ const ShoppingMode = () => {
       });
     });
 
-    const menuItems: ShoppingItem[] = Array.from(agg.values()).map((val, idx) => {
+    const menuItems: ShoppingItem[] = Array.from(agg.entries()).map(([key, val]) => {
       const prod = products.find((p: Product) => p.name.toLowerCase() === val.name.toLowerCase());
       return {
-        id: `menu_${idx}`,
+        id: `menu_${key}`,
         name: val.name,
         qty: val.qty,
         unit: val.unit,
@@ -75,18 +85,17 @@ const ShoppingMode = () => {
         };
       });
 
-    setItems([...menuItems, ...extraList]);
-  }, [weeklyMenu, foods, products, customShoppingItems, extraItems]);
+    return [...menuItems, ...extraList].map(i => ({ ...i, bought: boughtKeys.includes(i.id) }));
+  };
+  const items = buildItems();
 
   const toggleItem = (id: string) =>
-    setItems(prev => prev.map(item => item.id === id ? { ...item, bought: !item.bought } : item));
+    saveBought(boughtKeys.includes(id) ? boughtKeys.filter(k => k !== id) : [...boughtKeys, id]);
 
   const savePrice = (item: ShoppingItem) => {
     const price = parseFloat(tempPrice);
     if (isNaN(price) || price < 0) { setEditingPriceId(null); return; }
 
-    // Actualizar en items locales
-    setItems(prev => prev.map(i => i.id === item.id ? { ...i, price } : i));
 
     if (item.source === 'menu') {
       // Guardar/actualizar en catálogo de productos
@@ -118,7 +127,7 @@ const ShoppingMode = () => {
   return (
     <div style={{ maxWidth: '600px', margin: '0 auto', paddingBottom: '130px' }}>
       <header style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', background: 'var(--p-surface)', padding: '1rem', borderRadius: '16px', boxShadow: 'var(--shadow-premium)' }}>
-        <Link to="/shopping" style={{ color: 'var(--p-text)' }}><ArrowLeft /></Link>
+        <Link to={`/shopping?week=${week}`} style={{ color: 'var(--p-text)' }} aria-label="Regresar"><ArrowLeft /></Link>
         <div style={{ flex: 1 }}>
           <h1 style={{ fontSize: '1.5rem', fontWeight: '900' }}>🛒 En el Súper</h1>
           <p style={{ fontSize: '0.875rem', color: 'var(--p-text-muted)' }}>{items.length} artículos · est. ${totalAll.toFixed(0)}</p>
@@ -130,6 +139,9 @@ const ShoppingMode = () => {
           </div>
         </div>
       </header>
+
+      <WeekSwitch value={week} onChange={setWeek} className="full" />
+      <div style={{ height: '1rem' }} />
 
       {shoppingNotes.length > 0 && (
         <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '16px', padding: '1rem', marginBottom: '1.5rem' }}>

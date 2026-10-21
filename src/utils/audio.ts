@@ -1,7 +1,7 @@
 let ctx: AudioContext | null = null;
 
 const getCtx = () => {
-  if (!ctx) ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  if (!ctx) ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
   return ctx;
 };
 
@@ -14,6 +14,26 @@ const tone = (freq: number, duration: number, type: OscillatorType = 'sine', vol
     gain.connect(ac.destination);
     osc.type = type;
     osc.frequency.setValueAtTime(freq, ac.currentTime);
+    gain.gain.setValueAtTime(vol, ac.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + duration);
+    osc.start(ac.currentTime);
+    osc.stop(ac.currentTime + duration);
+  } catch {
+    // Web Audio no disponible
+  }
+};
+
+/** Barrido de frecuencia (efecto "nave") */
+const sweep = (from: number, to: number, duration: number, type: OscillatorType = 'sine', vol = 0.2) => {
+  try {
+    const ac = getCtx();
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.connect(gain);
+    gain.connect(ac.destination);
+    osc.type = type;
+    osc.frequency.setValueAtTime(from, ac.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(to, ac.currentTime + duration);
     gain.gain.setValueAtTime(vol, ac.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + duration);
     osc.start(ac.currentTime);
@@ -68,6 +88,44 @@ export const sounds = {
 
   tap: () => tone(660, 0.05, 'sine', 0.15),
 
+  /** Interruptor de la cabina */
+  blip: () => sequence([
+    { freq: 880, delay: 0, duration: 0.05, type: 'square', vol: 0.08 },
+    { freq: 1320, delay: 0.05, duration: 0.08, type: 'square', vol: 0.08 },
+  ]),
+
+  /** Misión cumplida */
+  mission: () => {
+    sweep(300, 1200, 0.25, 'sawtooth', 0.08);
+    sequence([
+      { freq: 784, delay: 0.22, duration: 0.1, type: 'triangle' },
+      { freq: 1047, delay: 0.32, duration: 0.1, type: 'triangle' },
+      { freq: 1568, delay: 0.42, duration: 0.3, type: 'triangle' },
+    ]);
+  },
+
+  /** Hipersalto: todas las misiones del día */
+  warp: () => {
+    sweep(80, 2400, 1.2, 'sawtooth', 0.12);
+    sweep(120, 3200, 1.4, 'triangle', 0.1);
+    sequence([
+      { freq: 1047, delay: 1.2, duration: 0.12 },
+      { freq: 1319, delay: 1.32, duration: 0.12 },
+      { freq: 1568, delay: 1.44, duration: 0.12 },
+      { freq: 2093, delay: 1.56, duration: 0.4 },
+    ]);
+  },
+
+  /** Ascenso de rango */
+  levelUp: () => sequence([
+    { freq: 523, delay: 0, duration: 0.12, type: 'square', vol: 0.12 },
+    { freq: 659, delay: 0.12, duration: 0.12, type: 'square', vol: 0.12 },
+    { freq: 784, delay: 0.24, duration: 0.12, type: 'square', vol: 0.12 },
+    { freq: 1047, delay: 0.36, duration: 0.2, type: 'square', vol: 0.12 },
+    { freq: 784, delay: 0.56, duration: 0.1, type: 'square', vol: 0.12 },
+    { freq: 1047, delay: 0.66, duration: 0.5, type: 'square', vol: 0.14 },
+  ]),
+
   select: () => tone(800, 0.06, 'sine', 0.12),
 
   deselect: () => tone(500, 0.06, 'sine', 0.1),
@@ -77,3 +135,19 @@ export const sounds = {
     { freq: 660, delay: 0.1, duration: 0.15 },
   ]),
 };
+
+/** Lee un texto en voz alta (para niños que todavía no leen) */
+export const speak = (text: string) => {
+  try {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'es-MX';
+    u.rate = 0.95;
+    const voice = window.speechSynthesis.getVoices().find(v => v.lang.startsWith('es'));
+    if (voice) u.voice = voice;
+    window.speechSynthesis.speak(u);
+  } catch { /* sin voz disponible */ }
+};
+
+export const canSpeak = () => typeof window !== 'undefined' && 'speechSynthesis' in window;

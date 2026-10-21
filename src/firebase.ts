@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 
 // Las credenciales de Firebase se deben agregar en Vercel
 // o en un archivo .env.local en tu computadora.
@@ -17,3 +17,10 @@ const hasConfig = !!firebaseConfig.apiKey;
 
 export const app = hasConfig ? initializeApp(firebaseConfig) : null;
 export const db = app ? getFirestore(app) : null;
+
+// Solo para pruebas locales: VITE_FIRESTORE_EMULATOR=localhost:8080
+const emulator = import.meta.env.VITE_FIRESTORE_EMULATOR as string | undefined;
+if (db && emulator) {
+  const [host, port] = emulator.split(':');
+  connectFirestoreEmulator(db, host, Number(port));
+}
